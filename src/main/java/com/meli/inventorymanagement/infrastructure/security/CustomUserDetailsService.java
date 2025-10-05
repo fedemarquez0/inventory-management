@@ -2,6 +2,8 @@ package com.meli.inventorymanagement.infrastructure.security;
 
 import com.meli.inventorymanagement.domain.model.User;
 import com.meli.inventorymanagement.infrastructure.adapter.output.persistence.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -12,23 +14,24 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public CustomUserDetailsService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-    }
-
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+                .orElseThrow(() -> {
+                    log.warn("User not found: {}", username);
+                    return new UsernameNotFoundException("User not found: " + username);
+                });
 
         if (!user.getIsActive()) {
+            log.warn("Attempt to authenticate with inactive user: {}", username);
             throw new UsernameNotFoundException("User is not active: " + username);
         }
 
@@ -45,13 +48,21 @@ public class CustomUserDetailsService implements UserDetailsService {
     public boolean authenticate(String username, String password) {
         try {
             User user = userRepository.findByUsername(username).orElse(null);
-            if (user == null || !user.getIsActive()) {
+            if (user == null) {
+                log.warn("Authentication failed: User not found: {}", username);
                 return false;
             }
-            return passwordEncoder.matches(password, user.getPasswordHash());
+            if (!user.getIsActive()) {
+                log.warn("Authentication failed: User is inactive: {}", username);
+                return false;
+            }
+            boolean matches = passwordEncoder.matches(password, user.getPasswordHash());
+            if (!matches) {
+                log.warn("Authentication failed: Invalid password for user: {}", username);
+            }
+            return matches;
         } catch (Exception e) {
-            // Log the error and return false
-            System.err.println("Authentication error for user " + username + ": " + e.getMessage());
+            log.error("Authentication error for user {}: {}", username, e.getMessage(), e);
             return false;
         }
     }
@@ -60,7 +71,8 @@ public class CustomUserDetailsService implements UserDetailsService {
         try {
             return userRepository.hasStorePermission(username, storeId);
         } catch (Exception e) {
-            System.err.println("Store permission check error for user " + username + ": " + e.getMessage());
+            log.error("Error checking store permission for user {} and store {}: {}",
+                     username, storeId, e.getMessage(), e);
             return false;
         }
     }
