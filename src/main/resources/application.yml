@@ -27,7 +27,6 @@ server:
     include-message: always
     include-binding-errors: always
 
-# Configuración de logging simplificada - Solo para desarrollo
 logging:
   level:
     root: INFO
@@ -64,7 +63,6 @@ springdoc:
     path: /swagger-ui.html
     enabled: true
 
-# Configuración de actuator para desarrollo
 management:
   endpoints:
     web:

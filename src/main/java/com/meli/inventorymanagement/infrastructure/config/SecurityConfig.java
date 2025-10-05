@@ -1,6 +1,6 @@
 package com.meli.inventorymanagement.infrastructure.config;
 
-import com.meli.inventorymanagement.infrastructure.security.JwtReactiveAuthenticationFilter;
+import com.meli.inventorymanagement.infrastructure.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,17 +12,13 @@ import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.authentication.HttpStatusServerEntryPoint;
 
-/**
- * Configuración de seguridad reactiva de la aplicación
- * Maneja autenticación JWT y autorización por endpoints
- */
 @Configuration
 @EnableWebFluxSecurity
 @EnableReactiveMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtReactiveAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {

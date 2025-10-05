@@ -28,7 +28,6 @@ public class StorePermissionAspect {
     @Around("@annotation(requireStorePermission)")
     public Object checkStorePermission(ProceedingJoinPoint joinPoint, RequireStorePermission requireStorePermission) throws Throwable {
 
-        // Extract storeId from method parameters
         Long storeId = extractStoreId(joinPoint, requireStorePermission.storeIdParam());
 
         Mono<Void> permissionCheck = ReactiveSecurityContextHolder.getContext()
@@ -73,10 +72,8 @@ public class StorePermissionAspect {
                     return Mono.error(new AccessDeniedException("Permission check failed: " + ex.getMessage()));
                 });
 
-        // Proceed with the method execution
         Object result = joinPoint.proceed();
 
-        // Wrap the result with permission check
         if (result instanceof Mono) {
             return permissionCheck.then((Mono<?>) result);
         } else if (result instanceof Flux) {

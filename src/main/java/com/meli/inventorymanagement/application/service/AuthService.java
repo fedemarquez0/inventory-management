@@ -4,7 +4,7 @@ import com.meli.inventorymanagement.application.dto.AuthRequest;
 import com.meli.inventorymanagement.application.dto.AuthResponse;
 import com.meli.inventorymanagement.common.constant.ErrorCode;
 import com.meli.inventorymanagement.infrastructure.exception.BusinessException;
-import com.meli.inventorymanagement.infrastructure.security.CustomUserDetailsService;
+import com.meli.inventorymanagement.infrastructure.security.UserDetailsService;
 import com.meli.inventorymanagement.infrastructure.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +17,7 @@ import reactor.core.publisher.Mono;
 public class AuthService {
 
     private final JwtUtil jwtUtil;
-    private final CustomUserDetailsService userDetailsService;
+    private final UserDetailsService userDetailsService;
 
     public Mono<AuthResponse> authenticate(AuthRequest request) {
         log.info("Authentication attempt for user: {}", request.getUsername());

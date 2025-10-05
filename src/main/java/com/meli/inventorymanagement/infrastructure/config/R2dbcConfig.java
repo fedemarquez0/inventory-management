@@ -9,9 +9,6 @@ import org.springframework.data.r2dbc.config.EnableR2dbcAuditing;
 import org.springframework.r2dbc.connection.init.ConnectionFactoryInitializer;
 import org.springframework.r2dbc.connection.init.ResourceDatabasePopulator;
 
-/**
- * Configuración de R2DBC para base de datos reactiva
- */
 @Slf4j
 @Configuration
 @EnableR2dbcAuditing

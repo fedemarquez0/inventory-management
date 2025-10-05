@@ -5,16 +5,16 @@ import com.meli.inventorymanagement.application.dto.InventoryResponse;
 import com.meli.inventorymanagement.application.dto.InventoryUpdateRequest;
 import com.meli.inventorymanagement.application.service.InventoryService;
 import com.meli.inventorymanagement.infrastructure.adapter.input.rest.InventoryController;
-import com.meli.inventorymanagement.infrastructure.security.JwtReactiveAuthenticationFilter;
+import com.meli.inventorymanagement.infrastructure.security.JwtAuthenticationFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -31,7 +31,7 @@ import static org.springframework.security.test.web.reactive.server.SecurityMock
     controllers = InventoryController.class,
     excludeFilters = @ComponentScan.Filter(
         type = FilterType.ASSIGNABLE_TYPE,
-        classes = JwtReactiveAuthenticationFilter.class
+        classes = JwtAuthenticationFilter.class
     )
 )
 @Import(TestSecurityConfig.class)
@@ -40,7 +40,7 @@ class InventoryControllerTest {
     @Autowired
     private WebTestClient webTestClient;
 
-    @MockBean
+    @MockitoBean
     private InventoryService inventoryService;
 
     private InventoryResponse inventoryResponse;
@@ -57,6 +57,10 @@ class InventoryControllerTest {
                 .version(0)
                 .updatedAt(LocalDateTime.now())
                 .build();
+
+        // Configuración por defecto para evitar NPE en tests sin mock específico
+        when(inventoryService.getInventoryByProductSku(anyString()))
+                .thenReturn(Flux.just(inventoryResponse));
     }
 
     @Test
