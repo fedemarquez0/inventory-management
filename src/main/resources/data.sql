@@ -3,9 +3,9 @@
 -- ===========================================
 INSERT INTO stores (id, name, is_active, created_at, updated_at)
 VALUES
-    (1, 'Shopping Dinosaurio Mall', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (2, 'Centro Maipu 712', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (3, 'Nuevo Centro Shopping', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    (1, 'Shopping Dinosaurio Mall', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (2, 'Centro Maipu 712', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (3, 'Nuevo Centro Shopping', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- ===========================================
 -- USERS
@@ -13,10 +13,10 @@ VALUES
 -- Password for all users: "12345" (BCrypt hashed)
 INSERT INTO users (id, username, password_hash, role, is_active, created_at, updated_at)
 VALUES
-    (1, 'admin', '$2a$10$64K/otiwP59MWSCrAWD8XezUo5l.v5k0X9zaV3S8NqKKbabW72WEa', 'ADMIN', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (2, 'user_dinosaurio', '$2a$10$64K/otiwP59MWSCrAWD8XezUo5l.v5k0X9zaV3S8NqKKbabW72WEa', 'STORE_USER', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (3, 'user_maipu', '$2a$10$64K/otiwP59MWSCrAWD8XezUo5l.v5k0X9zaV3S8NqKKbabW72WEa', 'STORE_USER', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (4, 'user_nuevo_centro', '$2a$10$64K/otiwP59MWSCrAWD8XezUo5l.v5k0X9zaV3S8NqKKbabW72WEa', 'STORE_USER', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    (1, 'admin', '$2a$10$64K/otiwP59MWSCrAWD8XezUo5l.v5k0X9zaV3S8NqKKbabW72WEa', 'ADMIN', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (2, 'user_dinosaurio', '$2a$10$64K/otiwP59MWSCrAWD8XezUo5l.v5k0X9zaV3S8NqKKbabW72WEa', 'STORE_USER', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (3, 'user_maipu', '$2a$10$64K/otiwP59MWSCrAWD8XezUo5l.v5k0X9zaV3S8NqKKbabW72WEa', 'STORE_USER', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (4, 'user_nuevo_centro', '$2a$10$64K/otiwP59MWSCrAWD8XezUo5l.v5k0X9zaV3S8NqKKbabW72WEa', 'STORE_USER', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- ===========================================
 -- USER STORE PERMISSIONS
@@ -33,23 +33,23 @@ VALUES
 -- ===========================================
 INSERT INTO products (id, sku, name, description, is_active, created_at, updated_at)
 VALUES
-    (1, 'REM-001-BL-M', 'Remera Básica Blanca M', 'Remera de algodón peinado 160gsm', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (2, 'REM-002-NG-L', 'Remera Básica Negra L', 'Remera cuello redondo negra', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (3, 'REM-003-AZ-S', 'Remera Azul S', 'Remera azul marino corte clásico', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (4, 'BUZ-001-GR-M', 'Buzo Hoodie Gris M', 'Buzo frisa liviano con capucha', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (5, 'BUZ-002-NG-L', 'Buzo Hoodie Negro L', 'Buzo de algodón grueso con bolsillo canguro', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (6, 'PAN-001-NG-32', 'Pantalón Chino Negro 32', 'Pantalón tipo chino con elastano', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (7, 'PAN-002-AZ-34', 'Jeans Azul 34', 'Jeans corte slim fit azul oscuro', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (8, 'BER-001-KH-M', 'Bermuda Cargo Khaki M', 'Bermuda con bolsillos laterales', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (9, 'BER-002-AZ-L', 'Bermuda Denim Azul L', 'Bermuda de jean azul clásico', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (10, 'CAM-001-BL-M', 'Camisa Blanca Oxford M', 'Camisa manga larga oxford blanco', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (11, 'CAM-002-CE-L', 'Camisa Celeste L', 'Camisa de poplin celeste claro', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (12, 'CMP-001-NG-M', 'Campera Rompeviento Negra M', 'Campera liviana impermeable con cierre', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (13, 'CMP-002-AZ-L', 'Campera Puffer Azul L', 'Campera acolchada pluma sintética', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (14, 'ZAP-001-NG-42', 'Zapatillas Urbanas Negras 42', 'Zapatillas urbanas con suela EVA', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (15, 'ZAP-002-BL-41', 'Zapatillas Running Blancas 41', 'Zapatillas deportivas livianas', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (16, 'GOR-001-NG-U', 'Gorra Negra U', 'Gorra ajustable negra con visera curva', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (17, 'MED-001-BL-U', 'Pack Medias Blancas U', 'Pack x3 medias tobillera blancas', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    (1, 'REM-001-BL-M', 'Remera Básica Blanca M', 'Remera de algodón peinado 160gsm', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (2, 'REM-002-NG-L', 'Remera Básica Negra L', 'Remera cuello redondo negra', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (3, 'REM-003-AZ-S', 'Remera Azul S', 'Remera azul marino corte clásico', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (4, 'BUZ-001-GR-M', 'Buzo Hoodie Gris M', 'Buzo frisa liviano con capucha', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (5, 'BUZ-002-NG-L', 'Buzo Hoodie Negro L', 'Buzo de algodón grueso con bolsillo canguro', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (6, 'PAN-001-NG-32', 'Pantalón Chino Negro 32', 'Pantalón tipo chino con elastano', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (7, 'PAN-002-AZ-34', 'Jeans Azul 34', 'Jeans corte slim fit azul oscuro', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (8, 'BER-001-KH-M', 'Bermuda Cargo Khaki M', 'Bermuda con bolsillos laterales', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (9, 'BER-002-AZ-L', 'Bermuda Denim Azul L', 'Bermuda de jean azul clásico', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (10, 'CAM-001-BL-M', 'Camisa Blanca Oxford M', 'Camisa manga larga oxford blanco', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (11, 'CAM-002-CE-L', 'Camisa Celeste L', 'Camisa de poplin celeste claro', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (12, 'CMP-001-NG-M', 'Campera Rompeviento Negra M', 'Campera liviana impermeable con cierre', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (13, 'CMP-002-AZ-L', 'Campera Puffer Azul L', 'Campera acolchada pluma sintética', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (14, 'ZAP-001-NG-42', 'Zapatillas Urbanas Negras 42', 'Zapatillas urbanas con suela EVA', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (15, 'ZAP-002-BL-41', 'Zapatillas Running Blancas 41', 'Zapatillas deportivas livianas', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (16, 'GOR-001-NG-U', 'Gorra Negra U', 'Gorra ajustable negra con visera curva', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    (17, 'MED-001-BL-U', 'Pack Medias Blancas U', 'Pack x3 medias tobillera blancas', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- ===========================================
 -- INVENTORY

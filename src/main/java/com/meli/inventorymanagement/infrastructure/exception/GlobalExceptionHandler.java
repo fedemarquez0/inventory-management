@@ -1,39 +1,65 @@
 package com.meli.inventorymanagement.infrastructure.exception;
 
 import com.meli.inventorymanagement.common.constant.ErrorCode;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.web.WebProperties;
+import org.springframework.boot.autoconfigure.web.reactive.error.AbstractErrorWebExceptionHandler;
+import org.springframework.boot.web.reactive.error.ErrorAttributes;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataAccessException;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerCodecConfigurer;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.transaction.TransactionException;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.MissingPathVariableException;
-import org.springframework.web.bind.MissingServletRequestParameterException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.stereotype.Component;
+import org.springframework.web.bind.support.WebExchangeBindException;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.server.*;
+import org.springframework.web.server.ServerWebInputException;
+import reactor.core.publisher.Mono;
 
-import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Slf4j
-@RestControllerAdvice
-public class GlobalExceptionHandler {
+@Component
+@Order(-2)
+public class GlobalExceptionHandler extends AbstractErrorWebExceptionHandler {
 
-    @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ErrorResponse> handleBusinessException(
-            BusinessException ex, HttpServletRequest request) {
+    public GlobalExceptionHandler(ErrorAttributes errorAttributes,
+                                   WebProperties webProperties,
+                                   ApplicationContext applicationContext,
+                                   ServerCodecConfigurer configurer) {
+        super(errorAttributes, webProperties.getResources(), applicationContext);
+        this.setMessageWriters(configurer.getWriters());
+    }
 
+    @Override
+    protected RouterFunction<ServerResponse> getRoutingFunction(ErrorAttributes errorAttributes) {
+        return RouterFunctions.route(RequestPredicates.all(), this::renderErrorResponse);
+    }
+
+    private Mono<ServerResponse> renderErrorResponse(ServerRequest request) {
+        Throwable error = getError(request);
+        log.error("Error occurred: {}", error.getMessage(), error);
+
+        return switch (error) {
+            case BusinessException ex -> handleBusinessException(ex, request);
+            case AccessDeniedException ex -> handleAccessDeniedException(ex, request);
+            case UsernameNotFoundException ex -> handleUsernameNotFoundException(ex, request);
+            case WebExchangeBindException ex -> handleValidationException(ex, request);
+            case OptimisticLockingFailureException ex -> handleOptimisticLockException(ex, request);
+            case DataAccessException ex -> handleDataAccessException(ex, request);
+            case ServerWebInputException ex -> handleServerWebInputException(ex, request);
+            default -> handleGenericException(error, request);
+        };
+    }
+
+    private Mono<ServerResponse> handleBusinessException(BusinessException ex, ServerRequest request) {
         log.error("Business exception: {} - {}", ex.getErrorCode().getCode(), ex.getMessage(), ex);
 
         ErrorResponse errorResponse = ErrorResponse.builder()
@@ -41,17 +67,16 @@ public class GlobalExceptionHandler {
                 .message(ex.getErrorCode().getMessage())
                 .details(ex.getDetails())
                 .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
+                .path(request.path())
                 .build();
 
         HttpStatus status = mapErrorCodeToHttpStatus(ex.getErrorCode());
-        return new ResponseEntity<>(errorResponse, status);
+        return ServerResponse.status(status)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(BodyInserters.fromValue(errorResponse));
     }
 
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDeniedException(
-            AccessDeniedException ex, HttpServletRequest request) {
-
+    private Mono<ServerResponse> handleAccessDeniedException(AccessDeniedException ex, ServerRequest request) {
         log.error("Access denied: {}", ex.getMessage(), ex);
 
         ErrorCode errorCode;
@@ -72,39 +97,37 @@ public class GlobalExceptionHandler {
                 .message(errorCode.getMessage())
                 .details(ex.getMessage())
                 .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
+                .path(request.path())
                 .build();
 
-        return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
+        return ServerResponse.status(HttpStatus.FORBIDDEN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(BodyInserters.fromValue(errorResponse));
     }
 
-    @ExceptionHandler(UsernameNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleUsernameNotFoundException(
-            UsernameNotFoundException ex, HttpServletRequest request) {
-
+    private Mono<ServerResponse> handleUsernameNotFoundException(UsernameNotFoundException ex, ServerRequest request) {
         log.error("User not found: {}", ex.getMessage(), ex);
 
         ErrorCode errorCode = ex.getMessage().contains("not active") ?
-            ErrorCode.USER_ACCOUNT_INACTIVE : ErrorCode.USER_NOT_FOUND;
+                ErrorCode.USER_ACCOUNT_INACTIVE : ErrorCode.USER_NOT_FOUND;
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .errorCode(errorCode.getCode())
                 .message(errorCode.getMessage())
                 .details(ex.getMessage())
                 .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
+                .path(request.path())
                 .build();
 
         HttpStatus status = errorCode == ErrorCode.USER_ACCOUNT_INACTIVE ?
-            HttpStatus.FORBIDDEN : HttpStatus.NOT_FOUND;
+                HttpStatus.FORBIDDEN : HttpStatus.NOT_FOUND;
 
-        return new ResponseEntity<>(errorResponse, status);
+        return ServerResponse.status(status)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(BodyInserters.fromValue(errorResponse));
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidationException(
-            MethodArgumentNotValidException ex, HttpServletRequest request) {
-
+    private Mono<ServerResponse> handleValidationException(WebExchangeBindException ex, ServerRequest request) {
         log.error("Validation error", ex);
 
         List<ErrorResponse.ValidationError> validationErrors = ex.getBindingResult()
@@ -120,17 +143,16 @@ public class GlobalExceptionHandler {
                 .errorCode(ErrorCode.VALIDATION_ERROR.getCode())
                 .message(ErrorCode.VALIDATION_ERROR.getMessage())
                 .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
+                .path(request.path())
                 .validationErrors(validationErrors)
                 .build();
 
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+        return ServerResponse.status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(BodyInserters.fromValue(errorResponse));
     }
 
-    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-    public ResponseEntity<ErrorResponse> handleOptimisticLockException(
-            ObjectOptimisticLockingFailureException ex, HttpServletRequest request) {
-
+    private Mono<ServerResponse> handleOptimisticLockException(OptimisticLockingFailureException ex, ServerRequest request) {
         log.error("Optimistic lock failure", ex);
 
         ErrorResponse errorResponse = ErrorResponse.builder()
@@ -138,220 +160,80 @@ public class GlobalExceptionHandler {
                 .message(ErrorCode.OPTIMISTIC_LOCK_FAILURE.getMessage())
                 .details("The resource was modified by another transaction. Please retry your operation.")
                 .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
+                .path(request.path())
                 .build();
 
-        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+        return ServerResponse.status(HttpStatus.CONFLICT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(BodyInserters.fromValue(errorResponse));
     }
 
-    @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ErrorResponse> handleBadCredentialsException(
-            BadCredentialsException ex, HttpServletRequest request) {
-
-        log.error("Bad credentials", ex);
+    private Mono<ServerResponse> handleDataAccessException(DataAccessException ex, ServerRequest request) {
+        log.error("Database error", ex);
 
         ErrorResponse errorResponse = ErrorResponse.builder()
-                .errorCode(ErrorCode.INVALID_CREDENTIALS.getCode())
-                .message(ErrorCode.INVALID_CREDENTIALS.getMessage())
+                .errorCode(ErrorCode.DATABASE_ERROR.getCode())
+                .message(ErrorCode.DATABASE_ERROR.getMessage())
+                .details("A database error occurred while processing your request")
                 .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
+                .path(request.path())
                 .build();
 
-        return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
+        return ServerResponse.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(BodyInserters.fromValue(errorResponse));
     }
 
-    @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<ErrorResponse> handleAuthenticationException(
-            AuthenticationException ex, HttpServletRequest request) {
-
-        log.error("Authentication error", ex);
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .errorCode(ErrorCode.AUTHENTICATION_FAILED.getCode())
-                .message(ErrorCode.AUTHENTICATION_FAILED.getMessage())
-                .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
-    }
-
-    @ExceptionHandler(MissingServletRequestParameterException.class)
-    public ResponseEntity<ErrorResponse> handleMissingParameterException(
-            MissingServletRequestParameterException ex, HttpServletRequest request) {
-
-        log.error("Missing required parameter: {}", ex.getMessage(), ex);
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .errorCode(ErrorCode.MISSING_REQUIRED_PARAMETER.getCode())
-                .message(ErrorCode.MISSING_REQUIRED_PARAMETER.getMessage())
-                .details("Missing required parameter: " + ex.getParameterName())
-                .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(MissingPathVariableException.class)
-    public ResponseEntity<ErrorResponse> handleMissingPathVariableException(
-            MissingPathVariableException ex, HttpServletRequest request) {
-
-        log.error("Missing path variable: {}", ex.getMessage(), ex);
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .errorCode(ErrorCode.MISSING_REQUIRED_PARAMETER.getCode())
-                .message(ErrorCode.MISSING_REQUIRED_PARAMETER.getMessage())
-                .details("Missing required path variable: " + ex.getVariableName())
-                .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ErrorResponse> handleTypeMismatchException(
-            MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
-
-        log.error("Parameter type mismatch: {}", ex.getMessage(), ex);
+    private Mono<ServerResponse> handleServerWebInputException(ServerWebInputException ex, ServerRequest request) {
+        log.error("Invalid input", ex);
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .errorCode(ErrorCode.INVALID_PARAMETER_FORMAT.getCode())
                 .message(ErrorCode.INVALID_PARAMETER_FORMAT.getMessage())
-                .details(String.format("Invalid format for parameter '%s'. Expected type: %s",
-                        ex.getName(), ex.getRequiredType().getSimpleName()))
+                .details(ex.getReason())
                 .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
+                .path(request.path())
                 .build();
 
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+        return ServerResponse.status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(BodyInserters.fromValue(errorResponse));
     }
 
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
-            HttpMessageNotReadableException ex, HttpServletRequest request) {
-
-        log.error("JSON parse error: {}", ex.getMessage(), ex);
-
-        ErrorCode errorCode = ex.getMessage().contains("Required request body is missing") ?
-            ErrorCode.REQUEST_BODY_MISSING : ErrorCode.JSON_PARSE_ERROR;
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .errorCode(errorCode.getCode())
-                .message(errorCode.getMessage())
-                .details("Invalid JSON format in request body")
-                .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorResponse> handleDataIntegrityViolationException(
-            DataIntegrityViolationException ex, HttpServletRequest request) {
-
-        log.error("Data integrity violation: {}", ex.getMessage(), ex);
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .errorCode(ErrorCode.DATABASE_ERROR.getCode())
-                .message(ErrorCode.DATABASE_ERROR.getMessage())
-                .details("Data constraint violation occurred")
-                .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
-    }
-
-    @ExceptionHandler(DataAccessException.class)
-    public ResponseEntity<ErrorResponse> handleDataAccessException(
-            DataAccessException ex, HttpServletRequest request) {
-
-        log.error("Database access error: {}", ex.getMessage(), ex);
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .errorCode(ErrorCode.DATABASE_ERROR.getCode())
-                .message(ErrorCode.DATABASE_ERROR.getMessage())
-                .details("Database operation failed")
-                .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-
-    @ExceptionHandler(SQLException.class)
-    public ResponseEntity<ErrorResponse> handleSQLException(
-            SQLException ex, HttpServletRequest request) {
-
-        log.error("SQL error: {}", ex.getMessage(), ex);
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .errorCode(ErrorCode.DATABASE_CONNECTION_ERROR.getCode())
-                .message(ErrorCode.DATABASE_CONNECTION_ERROR.getMessage())
-                .details("Database connection or query failed")
-                .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-
-    @ExceptionHandler(TransactionException.class)
-    public ResponseEntity<ErrorResponse> handleTransactionException(
-            TransactionException ex, HttpServletRequest request) {
-
-        log.error("Transaction error: {}", ex.getMessage(), ex);
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .errorCode(ErrorCode.TRANSACTION_FAILED.getCode())
-                .message(ErrorCode.TRANSACTION_FAILED.getMessage())
-                .details("Database transaction could not be completed")
-                .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGenericException(
-            Exception ex, HttpServletRequest request) {
-
+    private Mono<ServerResponse> handleGenericException(Throwable ex, ServerRequest request) {
         log.error("Unexpected error", ex);
 
         ErrorResponse errorResponse = ErrorResponse.builder()
-                .errorCode(ErrorCode.INTERNAL_SERVER_ERROR.getCode())
-                .message(ErrorCode.INTERNAL_SERVER_ERROR.getMessage())
+                .errorCode("INTERNAL_SERVER_ERROR")
+                .message("An unexpected error occurred")
                 .details(ex.getMessage())
                 .timestamp(LocalDateTime.now())
-                .path(request.getRequestURI())
+                .path(request.path())
                 .build();
 
-        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+        return ServerResponse.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(BodyInserters.fromValue(errorResponse));
     }
 
     private HttpStatus mapErrorCodeToHttpStatus(ErrorCode errorCode) {
         return switch (errorCode) {
-            case PRODUCT_NOT_FOUND, STORE_NOT_FOUND, INVENTORY_NOT_FOUND, USER_NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case INSUFFICIENT_STOCK, NEGATIVE_QUANTITY_NOT_ALLOWED, INVALID_ADJUSTMENT,
-                 PRODUCT_ALREADY_EXISTS, STORE_ALREADY_EXISTS, VALIDATION_ERROR,
-                 INVALID_REQUEST, MISSING_REQUIRED_PARAMETER, INVALID_PARAMETER_FORMAT,
-                 REQUEST_BODY_MISSING, JSON_PARSE_ERROR, INVALID_SKU_FORMAT -> HttpStatus.BAD_REQUEST;
-            case OPTIMISTIC_LOCK_FAILURE -> HttpStatus.CONFLICT;
-            case AUTHENTICATION_FAILED, INVALID_TOKEN, SESSION_EXPIRED,
-                 UNAUTHORIZED_ACCESS, INVALID_CREDENTIALS, USER_NOT_AUTHENTICATED,
-                 TOKEN_EXTRACTION_ERROR -> HttpStatus.UNAUTHORIZED;
-            case ACCESS_DENIED_TO_STORE, ADMIN_ACCESS_REQUIRED, STORE_PERMISSION_DENIED,
-                 USER_ROLE_INSUFFICIENT, USER_ACCOUNT_INACTIVE -> HttpStatus.FORBIDDEN;
-            case SERVICE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
-            case DATABASE_ERROR, DATABASE_CONNECTION_ERROR, TRANSACTION_FAILED,
-                 INVENTORY_OPERATION_FAILED, PASSWORD_ENCODING_ERROR, PERMISSION_CHECK_FAILED,
-                 RESOURCE_ACCESS_ERROR, CONFIGURATION_ERROR, EXTERNAL_SERVICE_ERROR,
-                 INTERNAL_SERVER_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
-            default -> HttpStatus.INTERNAL_SERVER_ERROR;
+            case PRODUCT_NOT_FOUND, STORE_NOT_FOUND, INVENTORY_NOT_FOUND, USER_NOT_FOUND ->
+                    HttpStatus.NOT_FOUND;
+            case INVALID_SKU_FORMAT, INVALID_PARAMETER_FORMAT, NEGATIVE_QUANTITY_NOT_ALLOWED,
+                 INVALID_ADJUSTMENT, VALIDATION_ERROR ->
+                    HttpStatus.BAD_REQUEST;
+            case INSUFFICIENT_STOCK, INVENTORY_OPERATION_FAILED ->
+                    HttpStatus.CONFLICT;
+            case INVALID_CREDENTIALS, AUTHENTICATION_FAILED, TOKEN_EXTRACTION_ERROR ->
+                    HttpStatus.UNAUTHORIZED;
+            case STORE_PERMISSION_DENIED, USER_NOT_AUTHENTICATED, ADMIN_ACCESS_REQUIRED,
+                 ACCESS_DENIED_TO_STORE, USER_ACCOUNT_INACTIVE ->
+                    HttpStatus.FORBIDDEN;
+            case OPTIMISTIC_LOCK_FAILURE ->
+                    HttpStatus.CONFLICT;
+            default ->
+                    HttpStatus.INTERNAL_SERVER_ERROR;
         };
     }
 }

@@ -2,19 +2,19 @@ spring:
   application:
     name: inventory-management
 
-  datasource:
-    url: jdbc:sqlite:inventory.db
-    driver-class-name: org.sqlite.JDBC
+  r2dbc:
+    url: r2dbc:h2:file:///./inventory-db;DB_CLOSE_DELAY=-1;MODE=MySQL
+    username: sa
+    password:
+    pool:
+      initial-size: 10
+      max-size: 20
+      max-idle-time: 30m
+      max-acquire-time: 3s
 
-  jpa:
-    database-platform: org.hibernate.community.dialect.SQLiteDialect
-    hibernate:
-      ddl-auto: update
-    show-sql: false
-    properties:
-      hibernate:
-        format_sql: true
-        use_sql_comments: false
+  h2:
+    console:
+      enabled: false
 
   jackson:
     serialization:
@@ -37,8 +37,8 @@ logging:
     com.meli.inventorymanagement.infrastructure.exception: DEBUG
     com.meli.inventorymanagement.infrastructure.adapter.input.rest: INFO
     org.springframework.security: WARN
-    org.hibernate.SQL: INFO
-    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+    org.springframework.data.r2dbc: DEBUG
+    io.r2dbc: DEBUG
     org.springframework.web: INFO
     org.springframework.boot: INFO
   pattern:

@@ -1,56 +1,47 @@
 package com.meli.inventorymanagement.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meli.inventorymanagement.application.dto.InventoryAdjustmentRequest;
 import com.meli.inventorymanagement.application.dto.InventoryResponse;
 import com.meli.inventorymanagement.application.dto.InventoryUpdateRequest;
 import com.meli.inventorymanagement.application.service.InventoryService;
 import com.meli.inventorymanagement.infrastructure.adapter.input.rest.InventoryController;
-import com.meli.inventorymanagement.infrastructure.config.SecurityConfig;
-import com.meli.inventorymanagement.infrastructure.security.CustomUserDetailsService;
-import com.meli.inventorymanagement.infrastructure.security.JwtAuthenticationFilter;
-import com.meli.inventorymanagement.infrastructure.security.JwtUtil;
+import com.meli.inventorymanagement.infrastructure.security.JwtReactiveAuthenticationFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.mockUser;
 
-@WebMvcTest(InventoryController.class)
-@Import(SecurityConfig.class)
+@WebFluxTest(
+    controllers = InventoryController.class,
+    excludeFilters = @ComponentScan.Filter(
+        type = FilterType.ASSIGNABLE_TYPE,
+        classes = JwtReactiveAuthenticationFilter.class
+    )
+)
+@Import(TestSecurityConfig.class)
 class InventoryControllerTest {
 
     @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
+    private WebTestClient webTestClient;
 
     @MockBean
     private InventoryService inventoryService;
-
-    @MockBean
-    private JwtAuthenticationFilter jwtAuthenticationFilter;
-
-    @MockBean
-    private JwtUtil jwtUtil;
-
-    @MockBean
-    private CustomUserDetailsService userDetailsService;
 
     private InventoryResponse inventoryResponse;
 
@@ -58,81 +49,146 @@ class InventoryControllerTest {
     void setUp() {
         inventoryResponse = InventoryResponse.builder()
                 .id(1L)
-                .productSku("LAPTOP-001")
-                .productName("Gaming Laptop")
+                .productSku("REM-001-BL-M")
+                .productName("Remera Básica Blanca M")
                 .storeId(1L)
-                .storeName("Store Downtown")
-                .availableQty(10)
+                .storeName("Shopping Dinosaurio Mall")
+                .availableQty(25)
                 .version(0)
                 .updatedAt(LocalDateTime.now())
                 .build();
     }
 
     @Test
-    @WithMockUser
-    void getInventoryByProduct_Success() throws Exception {
-        when(inventoryService.getInventoryByProductSku("LAPTOP-001"))
-                .thenReturn(Arrays.asList(inventoryResponse));
+    void getInventoryByProduct_Success() {
+        // Given
+        when(inventoryService.getInventoryByProductSku("REM-001-BL-M"))
+                .thenReturn(Flux.just(inventoryResponse));
 
-        mockMvc.perform(get("/api/inventory/LAPTOP-001/stores")
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].productSku").value("LAPTOP-001"))
-                .andExpect(jsonPath("$[0].availableQty").value(10));
+        // When & Then
+        webTestClient
+                .mutateWith(mockUser().roles("ADMIN"))
+                .get()
+                .uri("/api/inventory/REM-001-BL-M/stores")
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(InventoryResponse.class)
+                .hasSize(1)
+                .contains(inventoryResponse);
     }
 
     @Test
-    @WithMockUser
-    void getInventoryByProductAndStore_Success() throws Exception {
-        when(inventoryService.getInventoryByProductSkuAndStore("LAPTOP-001", 1L))
-                .thenReturn(inventoryResponse);
+    void getInventoryByProductAndStore_Success() {
+        // Given
+        when(inventoryService.getInventoryByProductSkuAndStore("REM-001-BL-M", 1L))
+                .thenReturn(Mono.just(inventoryResponse));
 
-        mockMvc.perform(get("/api/inventory/LAPTOP-001/stores/1")
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.productSku").value("LAPTOP-001"))
-                .andExpect(jsonPath("$.storeId").value(1))
-                .andExpect(jsonPath("$.availableQty").value(10));
+        // When & Then
+        webTestClient
+                .mutateWith(mockUser().roles("STORE_USER"))
+                .get()
+                .uri("/api/inventory/REM-001-BL-M/stores/1")
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(InventoryResponse.class)
+                .isEqualTo(inventoryResponse);
     }
 
     @Test
-    @WithMockUser
-    void updateInventory_Success() throws Exception {
-        InventoryUpdateRequest request = new InventoryUpdateRequest(20);
+    void updateInventory_Success() {
+        // Given
+        InventoryUpdateRequest request = InventoryUpdateRequest.builder()
+                .availableQty(30)
+                .build();
+
+        InventoryResponse updatedResponse = InventoryResponse.builder()
+                .id(1L)
+                .productSku("REM-001-BL-M")
+                .productName("Remera Básica Blanca M")
+                .storeId(1L)
+                .storeName("Shopping Dinosaurio Mall")
+                .availableQty(30)
+                .version(1)
+                .updatedAt(LocalDateTime.now())
+                .build();
 
         when(inventoryService.updateInventory(anyString(), anyLong(), any(InventoryUpdateRequest.class)))
-                .thenReturn(inventoryResponse);
+                .thenReturn(Mono.just(updatedResponse));
 
-        mockMvc.perform(put("/api/inventory/LAPTOP-001/stores/1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.productSku").value("LAPTOP-001"));
+        // When & Then
+        webTestClient
+                .mutateWith(mockUser().roles("STORE_USER"))
+                .put()
+                .uri("/api/inventory/REM-001-BL-M/stores/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(InventoryResponse.class)
+                .isEqualTo(updatedResponse);
     }
 
     @Test
-    @WithMockUser
-    void adjustInventory_Success() throws Exception {
-        InventoryAdjustmentRequest request = new InventoryAdjustmentRequest(5);
+    void adjustInventory_Success() {
+        // Given
+        InventoryAdjustmentRequest request = InventoryAdjustmentRequest.builder()
+                .adjustment(5)
+                .build();
+
+        InventoryResponse adjustedResponse = InventoryResponse.builder()
+                .id(1L)
+                .productSku("REM-001-BL-M")
+                .productName("Remera Básica Blanca M")
+                .storeId(1L)
+                .storeName("Shopping Dinosaurio Mall")
+                .availableQty(30)
+                .version(1)
+                .updatedAt(LocalDateTime.now())
+                .build();
 
         when(inventoryService.adjustInventory(anyString(), anyLong(), any(InventoryAdjustmentRequest.class)))
-                .thenReturn(inventoryResponse);
+                .thenReturn(Mono.just(adjustedResponse));
 
-        mockMvc.perform(post("/api/inventory/LAPTOP-001/stores/1/adjustments")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.productSku").value("LAPTOP-001"));
+        // When & Then
+        webTestClient
+                .mutateWith(mockUser().roles("STORE_USER"))
+                .post()
+                .uri("/api/inventory/REM-001-BL-M/stores/1/adjustments")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(InventoryResponse.class)
+                .isEqualTo(adjustedResponse);
     }
 
     @Test
-    @WithMockUser
-    void updateInventory_ValidationError_NegativeQuantity() throws Exception {
-        InventoryUpdateRequest request = new InventoryUpdateRequest(-5);
+    void updateInventory_ValidationError_NegativeQuantity() {
+        // Given
+        InventoryUpdateRequest request = InventoryUpdateRequest.builder()
+                .availableQty(-5)
+                .build();
 
-        mockMvc.perform(put("/api/inventory/LAPTOP-001/stores/1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
+        // When & Then
+        webTestClient
+                .mutateWith(mockUser().roles("STORE_USER"))
+                .put()
+                .uri("/api/inventory/REM-001-BL-M/stores/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void getInventoryByProduct_Unauthorized() {
+        // When & Then
+        webTestClient.get()
+                .uri("/api/inventory/REM-001-BL-M/stores")
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus().isUnauthorized();
     }
 }

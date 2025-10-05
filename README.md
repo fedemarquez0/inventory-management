@@ -1,75 +1,105 @@
-# Sistema de Gestión de Inventario
+# Inventory Management System - Reactive Version
 
-Sistema de gestión de inventario para cadenas de tiendas minoristas construido con **Java 17** y **Spring Boot 3.2**, implementando arquitectura hexagonal, control de concurrencia optimista y autenticación JWT.
+Sistema de gestión de inventario con arquitectura hexagonal y programación reactiva usando Spring WebFlux.
 
-## Características Principales
+## 🚀 Características Principales
 
-- **Arquitectura Hexagonal**: Separación clara entre dominio, aplicación e infraestructura
-- **Control de Concurrencia**: Implementación de Optimistic Locking con `@Version`
-- **Seguridad JWT**: Autenticación basada en tokens Bearer
-- **Documentación API**: Swagger/OpenAPI 3.0 completamente integrado
-- **Manejo de Errores**: Sistema centralizado con códigos de error específicos
-- **Logging**: Sistema de logs estructurado con SLF4J
-- **Tests**: Suite completa de pruebas unitarias con JUnit 5 y Mockito
+- **Arquitectura Hexagonal**: Separación clara de responsabilidades
+- **Programación Reactiva**: Uso de Reactor (Mono/Flux) para operaciones no bloqueantes
+- **Base de Datos Reactiva**: R2DBC con SQLite para persistencia reactiva
+- **Autenticación JWT**: Seguridad reactiva con Spring Security WebFlux
+- **Control de Concurrencia**: Optimistic locking con retry automático
+- **Documentación API**: Swagger/OpenAPI integrado
+- **Manejo de Errores**: Error handler personalizado con códigos de error específicos
+- **Logs**: Sistema de logging completo con SLF4J y Logback
 
-## Tecnologías Utilizadas
+## 📋 Requisitos
 
-- **Java 17**
-- **Spring Boot 3.2.0**
-- **Spring Data JPA**
-- **Spring Security**
-- **JWT (jjwt 0.12.3)**
-- **SQLite**
-- **Lombok**
-- **Swagger/OpenAPI**
-- **Maven**
-- **JUnit 5**
-- **Mockito**
+- Java 21
+- Maven 3.6+
 
-## Modelo de Datos
+## 🛠️ Tecnologías
 
-### Tablas
+- Spring Boot 3.5.6
+- Spring WebFlux (Programación Reactiva)
+- Spring Data R2DBC (Base de datos reactiva)
+- Spring Security (Seguridad reactiva)
+- R2DBC SQLite Driver
+- JWT (jsonwebtoken)
+- Lombok
+- Swagger/OpenAPI
+- Project Reactor
 
-#### stores
-- `id` (PK, BIGINT)
-- `name` (VARCHAR, UNIQUE)
-- `is_active` (BOOLEAN)
-- `created_at` (TIMESTAMP)
-- `updated_at` (TIMESTAMP)
+## 🏗️ Arquitectura
 
-#### products
-- `id` (PK, BIGINT)
-- `sku` (VARCHAR, UNIQUE)
-- `name` (VARCHAR)
-- `description` (VARCHAR)
-- `is_active` (BOOLEAN)
-- `created_at` (TIMESTAMP)
-- `updated_at` (TIMESTAMP)
+```
+src/main/java/com/meli/inventorymanagement/
+├── application/              # Capa de aplicación
+│   ├── dto/                 # Data Transfer Objects
+│   ├── mapper/              # Mappers de entidad a DTO
+│   └── service/             # Servicios de aplicación (lógica reactiva)
+├── domain/                   # Capa de dominio
+│   └── model/               # Entidades de dominio (R2DBC)
+├── infrastructure/           # Capa de infraestructura
+│   ├── adapter/
+│   │   ├── input/rest/      # Controladores REST (WebFlux)
+│   │   └── output/persistence/ # Repositorios R2DBC
+│   ├── config/              # Configuraciones
+│   ├── exception/           # Manejo de excepciones reactivo
+│   └── security/            # Seguridad reactiva y JWT
+└── common/
+    └── constant/            # Constantes y códigos de error
+```
 
-#### inventory
-- `id` (PK, BIGINT)
-- `product_id` (FK → products)
-- `store_id` (FK → stores)
-- `available_qty` (INTEGER, >= 0)
-- `version` (INTEGER) - Control de concurrencia optimista
-- `updated_at` (TIMESTAMP)
+## 🔧 Instalación y Ejecución
 
-## API Endpoints
+1. **Clonar el repositorio**
+```bash
+cd inventory-management
+```
 
-### Autenticación
+2. **Compilar el proyecto**
+```bash
+mvnw clean install
+```
 
-#### POST `/api/auth/login`
-Autenticación de usuario y obtención de token JWT.
+3. **Ejecutar la aplicación**
+```bash
+mvnw spring-boot:run
+```
 
-**Request Body:**
-```json
+La aplicación estará disponible en: `http://localhost:8080`
+
+## 📚 Documentación API (Swagger)
+
+Una vez iniciada la aplicación, acceder a:
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- API Docs: `http://localhost:8080/v3/api-docs`
+
+## 🔐 Autenticación
+
+### Usuarios de Prueba
+
+| Username | Password | Role | Acceso |
+|----------|----------|------|--------|
+| admin | 12345 | ADMIN | Todas las tiendas |
+| user_dinosaurio | 12345 | STORE_USER | Shopping Dinosaurio Mall |
+| user_maipu | 12345 | STORE_USER | Centro Maipu 712 |
+| user_nuevo_centro | 12345 | STORE_USER | Nuevo Centro Shopping |
+
+### Obtener Token JWT
+
+```bash
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
 {
   "username": "admin",
-  "password": "admin123"
+  "password": "12345"
 }
 ```
 
-**Response:**
+Respuesta:
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -78,286 +108,202 @@ Autenticación de usuario y obtención de token JWT.
 }
 ```
 
-**Usuarios de prueba:**
-- `admin` / `admin123`
-- `store1` / `store123`
-- `store2` / `store123`
+### Usar el Token
+
+Incluir en el header de las peticiones:
+```
+Authorization: Bearer {token}
+```
+
+## 🎯 Endpoints Principales
 
 ### Inventario
 
-#### GET `/api/inventory/{productSku}/stores`
-Obtiene el stock del producto en todas las tiendas.
+- **GET** `/api/inventory/{productSku}/stores` - Listar inventario del producto en todas las tiendas (Admin)
+- **GET** `/api/inventory/{productSku}/stores/{storeId}` - Ver inventario específico
+- **PUT** `/api/inventory/{productSku}/stores/{storeId}` - Establecer cantidad absoluta
+- **POST** `/api/inventory/{productSku}/stores/{storeId}/adjustments` - Ajustar cantidad (+ o -)
 
-**Headers:**
-```
-Authorization: Bearer {token}
-```
+## ⚡ Programación Reactiva
 
-**Response:**
-```json
-[
-  {
-    "id": 1,
-    "productSku": "LAPTOP-001",
-    "productName": "Gaming Laptop",
-    "storeId": 1,
-    "storeName": "Store Downtown",
-    "availableQty": 10,
-    "version": 0,
-    "updatedAt": "2025-10-04T10:30:00"
-  }
-]
-```
+### Características Reactivas
 
-#### GET `/api/inventory/{productSku}/stores/{storeId}`
-Obtiene el stock del producto en una tienda específica.
+1. **Controladores No Bloqueantes**: Retornan `Mono<T>` o `Flux<T>`
+2. **Repositorios Reactivos**: Extienden `R2dbcRepository`
+3. **Servicios Reactivos**: Composición de operaciones con operadores reactivos
+4. **Seguridad Reactiva**: WebFilter y ReactiveSecurityContextHolder
+5. **Retry Reactivo**: Manejo de fallos de optimistic locking con backoff
 
-**Headers:**
-```
-Authorization: Bearer {token}
-```
+### Ejemplo de Flujo Reactivo
 
-#### PUT `/api/inventory/{productSku}/stores/{storeId}`
-Establece el stock absoluto de un producto en una tienda.
-
-**Headers:**
-```
-Authorization: Bearer {token}
-Content-Type: application/json
-```
-
-**Request Body:**
-```json
-{
-  "availableQty": 25
+```java
+public Mono<InventoryResponse> updateInventory(String sku, Long storeId, InventoryUpdateRequest request) {
+    return Mono.zip(
+            productRepository.findBySku(sku),
+            storeRepository.findById(storeId)
+    )
+    .flatMap(tuple -> {
+        // Operación de actualización
+        return inventoryRepository.save(inventory);
+    })
+    .flatMap(this::enrichInventoryWithRelations)
+    .map(inventoryMapper::toResponse)
+    .retryWhen(Retry.backoff(3, Duration.ofMillis(100)))
+    .onErrorMap(/* manejo de errores */);
 }
 ```
 
-#### POST `/api/inventory/{productSku}/stores/{storeId}/adjustments`
-Ajusta el inventario (positivo para entradas, negativo para salidas).
+## 🔄 Control de Concurrencia
 
-**Headers:**
-```
-Authorization: Bearer {token}
-Content-Type: application/json
-```
+El sistema implementa **Optimistic Locking** con versioning automático:
 
-**Request Body:**
-```json
-{
-  "adjustment": -5
-}
-```
+- Cada operación de actualización incrementa la versión
+- Conflictos de concurrencia generan `OptimisticLockingFailureException`
+- Retry automático con backoff exponencial (3 intentos)
+- Sin bloqueos de base de datos - máxima concurrencia
 
-## Control de Concurrencia
+## 📊 Base de Datos
 
-El sistema implementa **Optimistic Locking** usando la anotación `@Version` de JPA:
+### SQLite Reactivo (R2DBC)
 
-- Cada registro de inventario tiene un campo `version`
-- Al actualizar, JPA verifica que la versión coincida
-- Si hay conflicto, lanza `ObjectOptimisticLockingFailureException`
-- El servicio reintenta automáticamente hasta 3 veces con backoff de 100ms
+- Persistencia en archivo: `inventory.db`
+- Inicialización automática con `schema.sql` y `data.sql`
+- Pool de conexiones configurado (10-20 conexiones)
 
-### Ejemplo de Flujo Concurrente
+### Entidades Principales
 
-1. Usuario A lee inventario (version=0, qty=10)
-2. Usuario B lee inventario (version=0, qty=10)
-3. Usuario A actualiza qty=8 (version se incrementa a 1) ✓
-4. Usuario B intenta actualizar qty=9 (espera version=0, pero es 1) ✗
-5. Sistema reintenta automáticamente con datos actualizados
+- **Product**: Productos (SKU único)
+- **Store**: Tiendas
+- **Inventory**: Stock por producto y tienda
+- **User**: Usuarios del sistema
+- **UserStorePermission**: Permisos de acceso
 
-## Manejo de Errores
+## 🛡️ Seguridad
 
-### Códigos de Error
+### Configuración Reactiva
 
-#### Inventario (INV-XXX)
-- `INV-001`: Product not found
-- `INV-002`: Store not found
-- `INV-003`: Inventory not found
-- `INV-004`: Insufficient stock
-- `INV-005`: Negative quantity not allowed
-- `INV-006`: Concurrent modification detected
-- `INV-007`: Product already exists
-- `INV-008`: Store already exists
-- `INV-009`: Invalid adjustment
+- Spring Security WebFlux
+- JWT con expiración configurable (24h por defecto)
+- Filtros reactivos (no bloqueantes)
+- Control de permisos por tienda con AOP reactivo
 
-#### Autenticación (AUTH-XXX)
-- `AUTH-001`: Authentication failed
-- `AUTH-002`: Invalid token
-- `AUTH-003`: Session expired
-- `AUTH-004`: Unauthorized access
-- `AUTH-005`: Invalid credentials
+### Roles y Permisos
 
-#### Validación (VAL-XXX)
-- `VAL-001`: Validation error
-- `VAL-002`: Invalid request parameters
+- **ADMIN**: Acceso total a todas las tiendas
+- **STORE_USER**: Acceso solo a tiendas asignadas
 
-#### Sistema (SYS-XXX)
-- `SYS-001`: Internal server error
-- `SYS-002`: Database error
-- `SYS-003`: Service unavailable
+## 📝 Logging
 
-### Formato de Respuesta de Error
+Configuración en `application.yml`:
+- Logs en consola y archivo rotativo
+- Nivel DEBUG para el paquete principal
+- Archivo: `logs/inventory-management.log`
+- Rotación: 50MB por archivo, 30 días de retención
 
-```json
-{
-  "errorCode": "INV-004",
-  "message": "Insufficient stock available",
-  "details": "Current: 5, Adjustment: -10",
-  "timestamp": "2025-10-04T10:30:00",
-  "path": "/api/inventory/LAPTOP-001/stores/1/adjustments",
-  "validationErrors": []
-}
-```
-
-## Instalación y Ejecución
-
-### Prerrequisitos
-- Java 17 o superior
-- Maven 3.6+
-
-### Pasos
-
-1. **Clonar el repositorio**
-```bash
-git clone <repository-url>
-cd inventory-management
-```
-
-2. **Compilar el proyecto**
-```bash
-mvn clean install
-```
-
-3. **Ejecutar la aplicación**
-```bash
-mvn spring-boot:run
-```
-
-4. **Acceder a la aplicación**
-- API: http://localhost:8080
-- Swagger UI: http://localhost:8080/swagger-ui.html
-- API Docs: http://localhost:8080/v3/api-docs
-
-## Ejecutar Tests
+## 🧪 Testing
 
 ```bash
-mvn test
+# Ejecutar tests
+mvnw test
+
+# Con cobertura
+mvnw test jacoco:report
 ```
 
-## Estructura del Proyecto
+## ⚙️ Configuración
 
-```
-src/
-├── main/
-│   ├── java/com/inventory/management/
-│   │   ├── application/
-│   │   │   ├── dto/              # Data Transfer Objects
-│   │   │   ├── mapper/           # Mappers entre entidades y DTOs
-│   │   │   └── service/          # Servicios de aplicación
-│   │   ├── domain/
-│   │   │   ├── model/            # Entidades del dominio
-│   │   │   └── port/             # Interfaces de puertos (hexagonal)
-│   │   ├── infrastructure/
-│   │   │   ├── adapter/
-│   │   │   │   ├── input/rest/   # Controladores REST
-│   │   │   │   └── output/persistence/ # Repositorios JPA
-│   │   │   ├── config/           # Configuraciones
-│   │   │   ├── exception/        # Manejo de excepciones
-│   │   │   └── security/         # Seguridad y JWT
-│   │   └── common/
-│   │       ├── constant/         # Constantes (ErrorCode)
-│   │       └── util/             # Utilidades
-│   └── resources/
-│       ├── application.yml       # Configuración principal
-│       └── data.sql             # Datos iniciales
-└── test/
-    └── java/com/inventory/management/
-        ├── controller/          # Tests de controladores
-        └── service/             # Tests de servicios
-```
-
-## Configuración
-
-### application.yml
+Archivo: `src/main/resources/application.yml`
 
 ```yaml
 spring:
-  datasource:
-    url: jdbc:sqlite:inventory.db
-    driver-class-name: org.sqlite.JDBC
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-
-server:
-  port: 8080
+  r2dbc:
+    url: r2dbc:sqlite:inventory.db
+    pool:
+      initial-size: 10
+      max-size: 20
 
 jwt:
   secret: mySecretKeyForInventoryManagementSystemThatIsLongEnoughForHS256Algorithm
-  expiration: 86400000  # 24 horas
+  expiration: 86400000 # 24 horas
 
-logging:
-  level:
-    com.inventory.management: DEBUG
-  file:
-    name: logs/inventory-management.log
+server:
+  port: 8080
 ```
 
-## Datos de Prueba
+## 🚨 Manejo de Errores
 
-El sistema viene con datos de prueba precargados:
+Códigos de error personalizados:
 
-### Tiendas
-- Store Downtown (ID: 1)
-- Store Mall (ID: 2)
-- Store Online (ID: 3)
+- `PRODUCT_NOT_FOUND` (404)
+- `STORE_NOT_FOUND` (404)
+- `INVENTORY_NOT_FOUND` (404)
+- `INSUFFICIENT_STOCK` (409)
+- `INVALID_CREDENTIALS` (401)
+- `STORE_PERMISSION_DENIED` (403)
+- `OPTIMISTIC_LOCK_FAILURE` (409)
+- Y más...
 
-### Productos
-- LAPTOP-001: Gaming Laptop
-- PHONE-001: Smartphone Pro
-- TABLET-001: Tablet Plus
-- HEADSET-001: Wireless Headset
+## 📦 Estructura de Respuestas
 
-## Características de Seguridad
+### Éxito
+```json
+{
+  "id": 1,
+  "productSku": "REM-001-BL-M",
+  "productName": "Remera Básica Blanca M",
+  "storeId": 1,
+  "storeName": "Shopping Dinosaurio Mall",
+  "availableQty": 25,
+  "version": 0,
+  "updatedAt": "2025-10-05T10:30:00"
+}
+```
 
-1. **Autenticación JWT**: Tokens con expiración de 24 horas
-2. **Endpoints Protegidos**: Todos los endpoints de inventario requieren autenticación
-3. **Password Encoding**: BCrypt para hash de contraseñas
-4. **CORS**: Configurado para permitir requests cross-origin
-5. **Session Stateless**: No se mantiene estado de sesión en el servidor
+### Error
+```json
+{
+  "errorCode": "PRODUCT_NOT_FOUND",
+  "message": "Product not found",
+  "details": "Product with SKU ABC-123 not found",
+  "timestamp": "2025-10-05T10:30:00",
+  "path": "/api/inventory/ABC-123/stores/1"
+}
+```
 
-## Logging
+## 🔍 Monitoreo
 
-Los logs se guardan en:
-- Consola: Nivel INFO
-- Archivo: `logs/inventory-management.log` con nivel DEBUG
-- SQL queries: DEBUG (útil para troubleshooting)
+Actuator endpoints disponibles:
+- `/actuator/health`
+- `/actuator/info`
+- `/actuator/metrics`
+- `/actuator/loggers`
 
-## Buenas Prácticas Implementadas
+## 📈 Rendimiento
 
-1. **Arquitectura Hexagonal**: Separación de responsabilidades
-2. **Inyección de Dependencias**: Constructor injection con Lombok
-3. **Manejo de Excepciones**: Centralizado con `@RestControllerAdvice`
-4. **Validación**: Bean Validation con anotaciones Jakarta
-5. **Transacciones**: `@Transactional` con niveles apropiados
-6. **DTOs**: Separación entre entidades y objetos de transferencia
-7. **Retry Pattern**: Reintentos automáticos para conflictos de concurrencia
-8. **Logging**: Estructurado y con niveles apropiados
-9. **Tests**: Cobertura de servicios y controladores
+Ventajas de la programación reactiva:
 
-## Mejoras Futuras
+- **No bloqueante**: Miles de requests concurrentes con pocos threads
+- **Backpressure**: Control de flujo automático
+- **Composición**: Operaciones encadenadas eficientemente
+- **Escalabilidad**: Mejor uso de recursos del sistema
 
-- [ ] Implementar cache con Redis
-- [ ] Agregar métricas con Micrometer/Prometheus
-- [ ] Implementar Circuit Breaker con Resilience4j
-- [ ] Agregar integración con sistema de eventos (Kafka/RabbitMQ)
-- [ ] Implementar auditoría completa con Spring Data Envers
-- [ ] Agregar soporte para múltiples bases de datos
-- [ ] Implementar API Gateway
-- [ ] Agregar monitoreo con ELK Stack
+## 🤝 Contribuir
 
-## Licencia
+1. Fork el proyecto
+2. Crear feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push al branch (`git push origin feature/AmazingFeature`)
+5. Abrir Pull Request
 
-Este proyecto es de código abierto y está disponible bajo la licencia MIT.
+## 📄 Licencia
+
+Este proyecto es de código abierto para fines educativos.
+
+## 👥 Contacto
+
+Para consultas y soporte: inventory@example.com
+
+---
+
+**Desarrollado con ❤️ usando Spring WebFlux y Project Reactor**
+

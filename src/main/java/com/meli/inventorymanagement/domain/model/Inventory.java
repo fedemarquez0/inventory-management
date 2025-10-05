@@ -1,17 +1,18 @@
 package com.meli.inventorymanagement.domain.model;
 
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.annotation.Version;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "inventory", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"product_id", "store_id"})
-})
+@Table("inventory")
 @Data
 @Builder
 @NoArgsConstructor
@@ -19,36 +20,29 @@ import java.time.LocalDateTime;
 public class Inventory {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    @Column("product_id")
+    private Long productId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "store_id", nullable = false)
-    private Store store;
+    @Column("store_id")
+    private Long storeId;
 
-    @Column(name = "available_qty", nullable = false)
+    @Column("available_qty")
     @Builder.Default
     private Integer availableQty = 0;
 
     @Version
-    @Column(nullable = false)
     @Builder.Default
     private Integer version = 0;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column("updated_at")
     private LocalDateTime updatedAt;
 
-    @PrePersist
-    protected void onCreate() {
-        updatedAt = LocalDateTime.now();
-    }
+    // Transient fields for joined data
+    @Transient
+    private Product product;
 
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
+    @Transient
+    private Store store;
 }

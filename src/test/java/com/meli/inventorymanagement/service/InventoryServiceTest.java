@@ -19,16 +19,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -58,9 +56,9 @@ class InventoryServiceTest {
     void setUp() {
         product = Product.builder()
                 .id(1L)
-                .sku("LAPTOP-001")
-                .name("Gaming Laptop")
-                .description("High performance gaming laptop")
+                .sku("REM-001-BL-M")
+                .name("Remera Básica Blanca M")
+                .description("Remera de algodón peinado 160gsm")
                 .isActive(true)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -68,7 +66,7 @@ class InventoryServiceTest {
 
         store = Store.builder()
                 .id(1L)
-                .name("Store Downtown")
+                .name("Shopping Dinosaurio Mall")
                 .isActive(true)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -76,20 +74,22 @@ class InventoryServiceTest {
 
         inventory = Inventory.builder()
                 .id(1L)
+                .productId(1L)
+                .storeId(1L)
                 .product(product)
                 .store(store)
-                .availableQty(10)
+                .availableQty(25)
                 .version(0)
                 .updatedAt(LocalDateTime.now())
                 .build();
 
         inventoryResponse = InventoryResponse.builder()
                 .id(1L)
-                .productSku("LAPTOP-001")
-                .productName("Gaming Laptop")
+                .productSku("REM-001-BL-M")
+                .productName("Remera Básica Blanca M")
                 .storeId(1L)
-                .storeName("Store Downtown")
-                .availableQty(10)
+                .storeName("Shopping Dinosaurio Mall")
+                .availableQty(25)
                 .version(0)
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -97,115 +97,227 @@ class InventoryServiceTest {
 
     @Test
     void getInventoryByProductSku_Success() {
-        when(productRepository.findBySku("LAPTOP-001")).thenReturn(Optional.of(product));
-        when(inventoryRepository.findByProductSku("LAPTOP-001")).thenReturn(Arrays.asList(inventory));
-        when(inventoryMapper.toResponseList(any())).thenReturn(Arrays.asList(inventoryResponse));
+        // Given
+        when(productRepository.findBySku("REM-001-BL-M")).thenReturn(Mono.just(product));
+        when(inventoryRepository.findByProductSku("REM-001-BL-M")).thenReturn(Flux.just(inventory));
+        when(productRepository.findById(1L)).thenReturn(Mono.just(product));
+        when(storeRepository.findById(1L)).thenReturn(Mono.just(store));
+        when(inventoryMapper.toResponse(any(Inventory.class))).thenReturn(inventoryResponse);
 
-        List<InventoryResponse> result = inventoryService.getInventoryByProductSku("LAPTOP-001");
+        // When
+        Flux<InventoryResponse> result = inventoryService.getInventoryByProductSku("REM-001-BL-M");
 
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals("LAPTOP-001", result.get(0).getProductSku());
-        verify(productRepository).findBySku("LAPTOP-001");
-        verify(inventoryRepository).findByProductSku("LAPTOP-001");
+        // Then
+        StepVerifier.create(result)
+                .expectNextMatches(response ->
+                        response.getProductSku().equals("REM-001-BL-M") &&
+                        response.getAvailableQty() == 25
+                )
+                .verifyComplete();
+
+        verify(productRepository).findBySku("REM-001-BL-M");
+        verify(inventoryRepository).findByProductSku("REM-001-BL-M");
     }
 
     @Test
     void getInventoryByProductSku_ProductNotFound() {
-        when(productRepository.findBySku("INVALID-SKU")).thenReturn(Optional.empty());
+        // Given
+        when(productRepository.findBySku("INVALID-SKU")).thenReturn(Mono.empty());
 
-        BusinessException exception = assertThrows(BusinessException.class,
-                () -> inventoryService.getInventoryByProductSku("INVALID-SKU"));
+        // When
+        Flux<InventoryResponse> result = inventoryService.getInventoryByProductSku("INVALID-SKU");
 
-        assertEquals(ErrorCode.PRODUCT_NOT_FOUND, exception.getErrorCode());
+        // Then
+        StepVerifier.create(result)
+                .expectErrorMatches(throwable ->
+                        throwable instanceof BusinessException &&
+                        ((BusinessException) throwable).getErrorCode() == ErrorCode.PRODUCT_NOT_FOUND
+                )
+                .verify();
+
         verify(productRepository).findBySku("INVALID-SKU");
         verify(inventoryRepository, never()).findByProductSku(anyString());
     }
 
     @Test
     void getInventoryByProductSkuAndStore_Success() {
-        when(storeRepository.existsById(1L)).thenReturn(true);
-        when(inventoryRepository.findByProductSkuAndStoreId("LAPTOP-001", 1L))
-                .thenReturn(Optional.of(inventory));
-        when(inventoryMapper.toResponse(inventory)).thenReturn(inventoryResponse);
+        // Given
+        when(storeRepository.existsById(1L)).thenReturn(Mono.just(true));
+        when(inventoryRepository.findByProductSkuAndStoreId("REM-001-BL-M", 1L))
+                .thenReturn(Mono.just(inventory));
+        when(productRepository.findById(1L)).thenReturn(Mono.just(product));
+        when(storeRepository.findById(1L)).thenReturn(Mono.just(store));
+        when(inventoryMapper.toResponse(any(Inventory.class))).thenReturn(inventoryResponse);
 
-        InventoryResponse result = inventoryService.getInventoryByProductSkuAndStore("LAPTOP-001", 1L);
+        // When
+        Mono<InventoryResponse> result = inventoryService.getInventoryByProductSkuAndStore("REM-001-BL-M", 1L);
 
-        assertNotNull(result);
-        assertEquals("LAPTOP-001", result.getProductSku());
-        assertEquals(1L, result.getStoreId());
-        verify(inventoryRepository).findByProductSkuAndStoreId("LAPTOP-001", 1L);
+        // Then
+        StepVerifier.create(result)
+                .expectNextMatches(response ->
+                        response.getProductSku().equals("REM-001-BL-M") &&
+                        response.getStoreId() == 1L &&
+                        response.getAvailableQty() == 25
+                )
+                .verifyComplete();
+
+        verify(inventoryRepository).findByProductSkuAndStoreId("REM-001-BL-M", 1L);
     }
 
     @Test
     void getInventoryByProductSkuAndStore_StoreNotFound() {
-        when(storeRepository.existsById(999L)).thenReturn(false);
+        // Given
+        when(storeRepository.existsById(999L)).thenReturn(Mono.just(false));
 
-        BusinessException exception = assertThrows(BusinessException.class,
-                () -> inventoryService.getInventoryByProductSkuAndStore("LAPTOP-001", 999L));
+        // When
+        Mono<InventoryResponse> result = inventoryService.getInventoryByProductSkuAndStore("REM-001-BL-M", 999L);
 
-        assertEquals(ErrorCode.STORE_NOT_FOUND, exception.getErrorCode());
+        // Then
+        StepVerifier.create(result)
+                .expectErrorMatches(throwable ->
+                        throwable instanceof BusinessException &&
+                        ((BusinessException) throwable).getErrorCode() == ErrorCode.STORE_NOT_FOUND
+                )
+                .verify();
+
         verify(storeRepository).existsById(999L);
         verify(inventoryRepository, never()).findByProductSkuAndStoreId(anyString(), anyLong());
     }
 
     @Test
-    void updateInventory_Success() {
-        InventoryUpdateRequest request = new InventoryUpdateRequest(20);
+    void updateInventory_CreateNew_Success() {
+        // Given
+        InventoryUpdateRequest request = InventoryUpdateRequest.builder()
+                .availableQty(30)
+                .build();
 
-        when(productRepository.findBySku("LAPTOP-001")).thenReturn(Optional.of(product));
-        when(storeRepository.findById(1L)).thenReturn(Optional.of(store));
-        when(inventoryRepository.findByProductIdAndStoreId(1L, 1L))
-                .thenReturn(Optional.of(inventory));
-        when(inventoryRepository.save(any(Inventory.class))).thenReturn(inventory);
-        when(inventoryMapper.toResponse(inventory)).thenReturn(inventoryResponse);
+        Inventory newInventory = Inventory.builder()
+                .productId(1L)
+                .storeId(1L)
+                .availableQty(30)
+                .version(0)
+                .updatedAt(LocalDateTime.now())
+                .build();
 
-        InventoryResponse result = inventoryService.updateInventory("LAPTOP-001", 1L, request);
+        when(productRepository.findBySku("REM-001-BL-M")).thenReturn(Mono.just(product));
+        when(storeRepository.findById(1L)).thenReturn(Mono.just(store));
+        when(inventoryRepository.findByProductIdAndStoreId(1L, 1L)).thenReturn(Mono.empty());
+        when(inventoryRepository.save(any(Inventory.class))).thenReturn(Mono.just(newInventory));
+        when(productRepository.findById(1L)).thenReturn(Mono.just(product));
+        when(storeRepository.findById(1L)).thenReturn(Mono.just(store));
+        when(inventoryMapper.toResponse(any(Inventory.class))).thenReturn(inventoryResponse);
 
-        assertNotNull(result);
+        // When
+        Mono<InventoryResponse> result = inventoryService.updateInventory("REM-001-BL-M", 1L, request);
+
+        // Then
+        StepVerifier.create(result)
+                .expectNextMatches(response -> response.getProductSku().equals("REM-001-BL-M"))
+                .verifyComplete();
+
         verify(inventoryRepository).save(any(Inventory.class));
     }
 
     @Test
     void adjustInventory_Success() {
-        InventoryAdjustmentRequest request = new InventoryAdjustmentRequest(5);
+        // Given
+        InventoryAdjustmentRequest request = InventoryAdjustmentRequest.builder()
+                .adjustment(5)
+                .build();
 
-        when(inventoryRepository.findByProductSkuAndStoreId("LAPTOP-001", 1L))
-                .thenReturn(Optional.of(inventory));
-        when(inventoryRepository.save(any(Inventory.class))).thenReturn(inventory);
-        when(inventoryMapper.toResponse(inventory)).thenReturn(inventoryResponse);
+        Inventory updatedInventory = Inventory.builder()
+                .id(1L)
+                .productId(1L)
+                .storeId(1L)
+                .availableQty(30)
+                .version(1)
+                .updatedAt(LocalDateTime.now())
+                .build();
 
-        InventoryResponse result = inventoryService.adjustInventory("LAPTOP-001", 1L, request);
+        when(inventoryRepository.findByProductSkuAndStoreId("REM-001-BL-M", 1L))
+                .thenReturn(Mono.just(inventory));
+        when(inventoryRepository.save(any(Inventory.class))).thenReturn(Mono.just(updatedInventory));
+        when(productRepository.findById(1L)).thenReturn(Mono.just(product));
+        when(storeRepository.findById(1L)).thenReturn(Mono.just(store));
+        when(inventoryMapper.toResponse(any(Inventory.class))).thenReturn(inventoryResponse);
 
-        assertNotNull(result);
+        // When
+        Mono<InventoryResponse> result = inventoryService.adjustInventory("REM-001-BL-M", 1L, request);
+
+        // Then
+        StepVerifier.create(result)
+                .expectNextMatches(response -> response.getProductSku().equals("REM-001-BL-M"))
+                .verifyComplete();
+
         verify(inventoryRepository).save(any(Inventory.class));
     }
 
     @Test
     void adjustInventory_InsufficientStock() {
-        InventoryAdjustmentRequest request = new InventoryAdjustmentRequest(-20);
+        // Given
+        InventoryAdjustmentRequest request = InventoryAdjustmentRequest.builder()
+                .adjustment(-30)
+                .build();
 
-        when(inventoryRepository.findByProductSkuAndStoreId("LAPTOP-001", 1L))
-                .thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductSkuAndStoreId("REM-001-BL-M", 1L))
+                .thenReturn(Mono.just(inventory));
 
-        BusinessException exception = assertThrows(BusinessException.class,
-                () -> inventoryService.adjustInventory("LAPTOP-001", 1L, request));
+        // When
+        Mono<InventoryResponse> result = inventoryService.adjustInventory("REM-001-BL-M", 1L, request);
 
-        assertEquals(ErrorCode.INSUFFICIENT_STOCK, exception.getErrorCode());
+        // Then
+        StepVerifier.create(result)
+                .expectErrorMatches(throwable ->
+                        throwable instanceof BusinessException &&
+                        ((BusinessException) throwable).getErrorCode() == ErrorCode.INSUFFICIENT_STOCK
+                )
+                .verify();
+
         verify(inventoryRepository, never()).save(any());
     }
 
     @Test
     void adjustInventory_InventoryNotFound() {
-        InventoryAdjustmentRequest request = new InventoryAdjustmentRequest(5);
+        // Given
+        InventoryAdjustmentRequest request = InventoryAdjustmentRequest.builder()
+                .adjustment(5)
+                .build();
 
-        when(inventoryRepository.findByProductSkuAndStoreId("LAPTOP-001", 999L))
-                .thenReturn(Optional.empty());
+        when(inventoryRepository.findByProductSkuAndStoreId("INVALID-SKU", 1L))
+                .thenReturn(Mono.empty());
 
-        BusinessException exception = assertThrows(BusinessException.class,
-                () -> inventoryService.adjustInventory("LAPTOP-001", 999L, request));
+        // When
+        Mono<InventoryResponse> result = inventoryService.adjustInventory("INVALID-SKU", 1L, request);
 
-        assertEquals(ErrorCode.INVENTORY_NOT_FOUND, exception.getErrorCode());
+        // Then
+        StepVerifier.create(result)
+                .expectErrorMatches(throwable ->
+                        throwable instanceof BusinessException &&
+                        ((BusinessException) throwable).getErrorCode() == ErrorCode.INVENTORY_NOT_FOUND
+                )
+                .verify();
+
+        verify(inventoryRepository, never()).save(any());
+    }
+
+    @Test
+    void updateInventory_NegativeQuantity_ShouldFail() {
+        // Given
+        InventoryUpdateRequest request = InventoryUpdateRequest.builder()
+                .availableQty(-5)
+                .build();
+
+        // When
+        Mono<InventoryResponse> result = inventoryService.updateInventory("REM-001-BL-M", 1L, request);
+
+        // Then
+        StepVerifier.create(result)
+                .expectErrorMatches(throwable ->
+                        throwable instanceof BusinessException &&
+                        ((BusinessException) throwable).getErrorCode() == ErrorCode.NEGATIVE_QUANTITY_NOT_ALLOWED
+                )
+                .verify();
+
         verify(inventoryRepository, never()).save(any());
     }
 }

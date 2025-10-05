@@ -5,12 +5,12 @@ import com.meli.inventorymanagement.application.dto.AuthResponse;
 import com.meli.inventorymanagement.application.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
 
 @Tag(name = "Authentication", description = "Authentication API")
 @RestController
@@ -23,40 +23,35 @@ public class AuthController {
 
     @Operation(summary = "Authenticate user", description = "Authenticate and get JWT token")
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest request,
-                                            HttpServletRequest httpRequest) {
+    public Mono<AuthResponse> login(@Valid @RequestBody AuthRequest request,
+                                     ServerWebExchange exchange) {
 
-        String clientIp = getClientIpAddress(httpRequest);
-        String userAgent = httpRequest.getHeader("User-Agent");
+        String clientIp = getClientIpAddress(exchange);
+        String userAgent = exchange.getRequest().getHeaders().getFirst("User-Agent");
 
         log.info("POST /api/auth/login - Username: {} - IP: {} - User-Agent: {} - Authentication attempt",
                 request.getUsername(), clientIp, userAgent);
 
-        try {
-            AuthResponse response = authService.authenticate(request);
-
-            log.info("Authentication successful - Username: {} - IP: {} - Token generated successfully",
-                    request.getUsername(), clientIp);
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.warn("Authentication failed - Username: {} - IP: {} - User-Agent: {} - Error: {}",
-                    request.getUsername(), clientIp, userAgent, e.getMessage());
-            throw e;
-        }
+        return authService.authenticate(request)
+                .doOnSuccess(response -> log.info("Authentication successful - Username: {} - IP: {} - Token generated successfully",
+                        request.getUsername(), clientIp))
+                .doOnError(e -> log.warn("Authentication failed - Username: {} - IP: {} - User-Agent: {} - Error: {}",
+                        request.getUsername(), clientIp, userAgent, e.getMessage()));
     }
 
-    private String getClientIpAddress(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
+    private String getClientIpAddress(ServerWebExchange exchange) {
+        String xForwardedFor = exchange.getRequest().getHeaders().getFirst("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
             return xForwardedFor.split(",")[0].trim();
         }
 
-        String xRealIp = request.getHeader("X-Real-IP");
+        String xRealIp = exchange.getRequest().getHeaders().getFirst("X-Real-IP");
         if (xRealIp != null && !xRealIp.isEmpty()) {
             return xRealIp;
         }
 
-        return request.getRemoteAddr();
+        return exchange.getRequest().getRemoteAddress() != null
+                ? exchange.getRequest().getRemoteAddress().getAddress().getHostAddress()
+                : "unknown";
     }
 }

@@ -1,24 +1,20 @@
 package com.meli.inventorymanagement.infrastructure.adapter.output.persistence;
 
 import com.meli.inventorymanagement.domain.model.User;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.r2dbc.repository.Query;
+import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-
-import java.util.Optional;
+import reactor.core.publisher.Mono;
 
 @Repository
-public interface UserRepository extends JpaRepository<User, Long> {
+public interface UserRepository extends R2dbcRepository<User, Long> {
 
-    Optional<User> findByUsername(String username);
+    Mono<User> findByUsername(String username);
 
-    @Query("SELECT CASE WHEN COUNT(u) > 0 THEN true ELSE false END " +
-           "FROM User u LEFT JOIN u.storePermissions sp " +
-           "WHERE u.username = :username AND (u.role = 'ADMIN' OR sp.store.id = :storeId)")
-    boolean hasStorePermission(@Param("username") String username, @Param("storeId") Long storeId);
-
-    @Query("SELECT u FROM User u LEFT JOIN FETCH u.storePermissions sp " +
-           "WHERE u.username = :username")
-    Optional<User> findByUsernameWithPermissions(@Param("username") String username);
+    @Query("SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END " +
+           "FROM users u " +
+           "LEFT JOIN user_store_permissions sp ON u.id = sp.user_id " +
+           "WHERE u.username = :username AND (u.role = 'ADMIN' OR sp.store_id = :storeId)")
+    Mono<Boolean> hasStorePermission(@Param("username") String username, @Param("storeId") Long storeId);
 }
