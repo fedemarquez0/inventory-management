@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+  sql:
+    init:
+      mode: never
+
+logging:
+  level:
+    root: WARN
+    com.inventory.management: INFO
+
+jwt:
+  secret: testSecretKeyForInventoryManagementSystemThatIsLongEnoughForHS256Algorithm
+  expiration: 3600000
