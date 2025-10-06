@@ -1,5 +1,7 @@
 package com.meli.inventorymanagement.infrastructure.security;
 
+import com.meli.inventorymanagement.common.constant.ErrorCode;
+import com.meli.inventorymanagement.infrastructure.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -36,39 +38,51 @@ public class JwtAuthenticationFilter implements WebFilter {
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             log.debug("No JWT token found in request to: {}", path);
-            return chain.filter(exchange);
+            return Mono.error(new BusinessException(
+                    ErrorCode.USER_NOT_AUTHENTICATED,
+                    "No authentication token provided"
+            ));
         }
 
         String jwt = authHeader.substring(7);
 
         return Mono.fromCallable(() -> jwtUtil.extractUsername(jwt))
-                .flatMap(username -> userDetailsService.findByUsername(username)
-                        .flatMap(userDetails -> {
-                            if (jwtUtil.validateToken(jwt, username)) {
-                                UsernamePasswordAuthenticationToken authentication =
-                                        new UsernamePasswordAuthenticationToken(
-                                                userDetails,
-                                                null,
-                                                userDetails.getAuthorities()
-                                        );
-
-                                log.debug("JWT token validated successfully for user: {}", username);
-
-                                return chain.filter(exchange)
-                                        .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication));
-                            } else {
-                                log.warn("Invalid JWT token for user: {}", username);
-                                return chain.filter(exchange);
-                            }
-                        })
-                        .onErrorResume(e -> {
-                            log.error("Error during JWT authentication: {}", e.getMessage());
-                            return chain.filter(exchange);
-                        })
-                )
-                .onErrorResume(e -> {
+                .onErrorMap(e -> {
                     log.error("Error extracting username from token: {}", e.getMessage());
-                    return chain.filter(exchange);
-                });
+                    return new BusinessException(
+                            ErrorCode.INVALID_TOKEN,
+                            "Invalid or malformed token"
+                    );
+                })
+                .flatMap(username -> userDetailsService.findByUsername(username)
+                        .onErrorMap(e -> {
+                            log.error("Error loading user details: {}", e.getMessage());
+                            return new BusinessException(
+                                    ErrorCode.USER_NOT_FOUND,
+                                    "User not found: " + username
+                            );
+                        })
+                        .flatMap(userDetails -> {
+                            if (!jwtUtil.validateToken(jwt, username)) {
+                                log.warn("Invalid JWT token for user: {}", username);
+                                return Mono.error(new BusinessException(
+                                        ErrorCode.INVALID_TOKEN,
+                                        "Token validation failed"
+                                ));
+                            }
+
+                            UsernamePasswordAuthenticationToken authentication =
+                                    new UsernamePasswordAuthenticationToken(
+                                            userDetails,
+                                            null,
+                                            userDetails.getAuthorities()
+                                    );
+
+                            log.debug("JWT token validated successfully for user: {}", username);
+
+                            return chain.filter(exchange)
+                                    .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication));
+                        })
+                );
     }
 }

@@ -12,9 +12,12 @@ public interface UserRepository extends R2dbcRepository<User, Long> {
 
     Mono<User> findByUsername(String username);
 
-    @Query("SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END " +
+    @Query("SELECT CASE WHEN COUNT(*) > 0 THEN TRUE ELSE FALSE END " +
            "FROM users u " +
-           "LEFT JOIN user_store_permissions sp ON u.id = sp.user_id " +
-           "WHERE u.username = :username AND (u.role = 'ADMIN' OR sp.store_id = :storeId)")
+           "WHERE u.username = :username " +
+           "AND (u.role = 'ADMIN' OR EXISTS (" +
+           "    SELECT 1 FROM user_store_permissions sp " +
+           "    WHERE sp.user_id = u.id AND sp.store_id = :storeId" +
+           "))")
     Mono<Boolean> hasStorePermission(@Param("username") String username, @Param("storeId") Long storeId);
 }
