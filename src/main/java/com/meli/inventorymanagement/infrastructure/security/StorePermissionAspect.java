@@ -1,8 +1,9 @@
 package com.meli.inventorymanagement.infrastructure.security;
 
 import com.meli.inventorymanagement.common.constant.ErrorCode;
-import com.meli.inventorymanagement.infrastructure.adapter.output.persistence.UserRepository;
-import com.meli.inventorymanagement.infrastructure.exception.BusinessException;
+import com.meli.inventorymanagement.domain.exception.BusinessException;
+import com.meli.inventorymanagement.domain.port.AuthenticationPort;
+import com.meli.inventorymanagement.domain.port.UserPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -24,7 +25,8 @@ import java.lang.reflect.Parameter;
 @RequiredArgsConstructor
 public class StorePermissionAspect {
 
-    private final UserRepository userRepository;
+    private final UserPort userPort;
+    private final AuthenticationPort authenticationPort;
 
     @Around("@annotation(requireStorePermission)")
     public Object checkStorePermission(ProceedingJoinPoint joinPoint, RequireStorePermission requireStorePermission) {
@@ -44,7 +46,7 @@ public class StorePermissionAspect {
                     String username = securityContext.getAuthentication().getName();
                     log.debug("Checking permissions for user: {}", username);
 
-                    return userRepository.findByUsername(username)
+                    return userPort.findByUsername(username)
                             .switchIfEmpty(Mono.error(new BusinessException(ErrorCode.USER_NOT_FOUND, "User not found: " + username)))
                             .flatMap(user -> {
                                 log.debug("User found: {} with role: {}", username, user.getRole());
@@ -70,7 +72,7 @@ public class StorePermissionAspect {
                                 // Para usuarios de tienda, verificar permisos específicos
                                 if (storeId != null) {
                                     log.debug("Checking store permission for user {} and store {}", username, storeId);
-                                    return userRepository.hasStorePermission(username, storeId)
+                                    return authenticationPort.hasStorePermission(username, storeId)
                                             .flatMap(hasPermission -> {
                                                 log.debug("Store permission result for user {} and store {}: {}",
                                                         username, storeId, hasPermission);
@@ -82,10 +84,10 @@ public class StorePermissionAspect {
                                                 }
                                                 return Mono.empty();
                                             });
-                                } else {
-                                    log.debug("No storeId provided, allowing access for user: {}", username);
-                                    return Mono.empty();
                                 }
+
+                                log.warn("No storeId found in request for non-admin user: {}", username);
+                                return Mono.error(new BusinessException(ErrorCode.INVALID_REQUEST, "Store ID is required"));
                             });
                 })
                 .then();
@@ -130,11 +132,6 @@ public class StorePermissionAspect {
     }
 
     private Long extractStoreId(ProceedingJoinPoint joinPoint, String paramName) {
-        if (paramName == null || paramName.isEmpty()) {
-            log.debug("No paramName specified for storeId extraction");
-            return null;
-        }
-
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         Method method = signature.getMethod();
         Parameter[] parameters = method.getParameters();
@@ -142,34 +139,21 @@ public class StorePermissionAspect {
 
         for (int i = 0; i < parameters.length; i++) {
             Parameter parameter = parameters[i];
-
-            // Check PathVariable annotation
             PathVariable pathVariable = parameter.getAnnotation(PathVariable.class);
+
             if (pathVariable != null) {
-                String pathVarName = pathVariable.value().isEmpty() ?
-                        (pathVariable.name().isEmpty() ? parameter.getName() : pathVariable.name()) :
-                        pathVariable.value();
+                String pathVarName = pathVariable.value().isEmpty() ? pathVariable.name() : pathVariable.value();
+                if (pathVarName.isEmpty()) {
+                    pathVarName = parameter.getName();
+                }
 
-                log.debug("Found PathVariable '{}' at position {}", pathVarName, i);
-
-                if (paramName.equals(pathVarName) && args[i] != null) {
-                    if (args[i] instanceof Long) {
-                        log.debug("Extracted storeId: {}", args[i]);
-                        return (Long) args[i];
-                    } else if (args[i] instanceof String) {
-                        try {
-                            Long storeId = Long.parseLong((String) args[i]);
-                            log.debug("Extracted and parsed storeId: {}", storeId);
-                            return storeId;
-                        } catch (NumberFormatException e) {
-                            log.warn("Could not parse storeId from string: {}", args[i]);
-                        }
-                    }
+                if (paramName.equals(pathVarName) && args[i] instanceof Long) {
+                    return (Long) args[i];
                 }
             }
         }
 
-        log.debug("No storeId found for parameter name: {}", paramName);
+        log.warn("Could not extract storeId from method parameters");
         return null;
     }
 }

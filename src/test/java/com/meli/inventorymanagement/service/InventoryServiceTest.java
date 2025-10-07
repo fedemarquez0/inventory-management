@@ -6,13 +6,13 @@ import com.meli.inventorymanagement.application.dto.InventoryUpdateRequest;
 import com.meli.inventorymanagement.application.mapper.InventoryMapper;
 import com.meli.inventorymanagement.application.service.InventoryService;
 import com.meli.inventorymanagement.common.constant.ErrorCode;
+import com.meli.inventorymanagement.domain.exception.BusinessException;
 import com.meli.inventorymanagement.domain.model.Inventory;
 import com.meli.inventorymanagement.domain.model.Product;
 import com.meli.inventorymanagement.domain.model.Store;
-import com.meli.inventorymanagement.infrastructure.adapter.output.persistence.InventoryRepository;
-import com.meli.inventorymanagement.infrastructure.adapter.output.persistence.ProductRepository;
-import com.meli.inventorymanagement.infrastructure.adapter.output.persistence.StoreRepository;
-import com.meli.inventorymanagement.infrastructure.exception.BusinessException;
+import com.meli.inventorymanagement.domain.port.InventoryPort;
+import com.meli.inventorymanagement.domain.port.ProductPort;
+import com.meli.inventorymanagement.domain.port.StorePort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,13 +33,13 @@ import static org.mockito.Mockito.*;
 class InventoryServiceTest {
 
     @Mock
-    private InventoryRepository inventoryRepository;
+    private InventoryPort inventoryPort;
 
     @Mock
-    private ProductRepository productRepository;
+    private ProductPort productPort;
 
     @Mock
-    private StoreRepository storeRepository;
+    private StorePort storePort;
 
     @Mock
     private InventoryMapper inventoryMapper;
@@ -98,10 +98,10 @@ class InventoryServiceTest {
     @Test
     void getInventoryByProductSku_Success() {
         // Given
-        when(productRepository.findBySku("REM-001-BL-M")).thenReturn(Mono.just(product));
-        when(inventoryRepository.findByProductSku("REM-001-BL-M")).thenReturn(Flux.just(inventory));
-        when(productRepository.findById(1L)).thenReturn(Mono.just(product));
-        when(storeRepository.findById(1L)).thenReturn(Mono.just(store));
+        when(productPort.findBySku("REM-001-BL-M")).thenReturn(Mono.just(product));
+        when(inventoryPort.findByProductSku("REM-001-BL-M")).thenReturn(Flux.just(inventory));
+        when(productPort.findById(1L)).thenReturn(Mono.just(product));
+        when(storePort.findById(1L)).thenReturn(Mono.just(store));
         when(inventoryMapper.toResponse(any(Inventory.class))).thenReturn(inventoryResponse);
 
         // When
@@ -115,14 +115,14 @@ class InventoryServiceTest {
                 )
                 .verifyComplete();
 
-        verify(productRepository).findBySku("REM-001-BL-M");
-        verify(inventoryRepository).findByProductSku("REM-001-BL-M");
+        verify(productPort).findBySku("REM-001-BL-M");
+        verify(inventoryPort).findByProductSku("REM-001-BL-M");
     }
 
     @Test
     void getInventoryByProductSku_ProductNotFound() {
         // Given
-        when(productRepository.findBySku("INVALID-SKU")).thenReturn(Mono.empty());
+        when(productPort.findBySku("INVALID-SKU")).thenReturn(Mono.empty());
 
         // When
         Flux<InventoryResponse> result = inventoryService.getInventoryByProductSku("INVALID-SKU");
@@ -135,18 +135,18 @@ class InventoryServiceTest {
                 )
                 .verify();
 
-        verify(productRepository).findBySku("INVALID-SKU");
-        verify(inventoryRepository, never()).findByProductSku(anyString());
+        verify(productPort).findBySku("INVALID-SKU");
+        verify(inventoryPort, never()).findByProductSku(anyString());
     }
 
     @Test
     void getInventoryByProductSkuAndStore_Success() {
         // Given
-        when(storeRepository.existsById(1L)).thenReturn(Mono.just(true));
-        when(inventoryRepository.findByProductSkuAndStoreId("REM-001-BL-M", 1L))
+        when(storePort.existsById(1L)).thenReturn(Mono.just(true));
+        when(inventoryPort.findByProductSkuAndStoreId("REM-001-BL-M", 1L))
                 .thenReturn(Mono.just(inventory));
-        when(productRepository.findById(1L)).thenReturn(Mono.just(product));
-        when(storeRepository.findById(1L)).thenReturn(Mono.just(store));
+        when(productPort.findById(1L)).thenReturn(Mono.just(product));
+        when(storePort.findById(1L)).thenReturn(Mono.just(store));
         when(inventoryMapper.toResponse(any(Inventory.class))).thenReturn(inventoryResponse);
 
         // When
@@ -161,13 +161,13 @@ class InventoryServiceTest {
                 )
                 .verifyComplete();
 
-        verify(inventoryRepository).findByProductSkuAndStoreId("REM-001-BL-M", 1L);
+        verify(inventoryPort).findByProductSkuAndStoreId("REM-001-BL-M", 1L);
     }
 
     @Test
     void getInventoryByProductSkuAndStore_StoreNotFound() {
         // Given
-        when(storeRepository.existsById(999L)).thenReturn(Mono.just(false));
+        when(storePort.existsById(999L)).thenReturn(Mono.just(false));
 
         // When
         Mono<InventoryResponse> result = inventoryService.getInventoryByProductSkuAndStore("REM-001-BL-M", 999L);
@@ -180,8 +180,8 @@ class InventoryServiceTest {
                 )
                 .verify();
 
-        verify(storeRepository).existsById(999L);
-        verify(inventoryRepository, never()).findByProductSkuAndStoreId(anyString(), anyLong());
+        verify(storePort).existsById(999L);
+        verify(inventoryPort, never()).findByProductSkuAndStoreId(anyString(), anyLong());
     }
 
     @Test
@@ -199,12 +199,12 @@ class InventoryServiceTest {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        when(productRepository.findBySku("REM-001-BL-M")).thenReturn(Mono.just(product));
-        when(storeRepository.findById(1L)).thenReturn(Mono.just(store));
-        when(inventoryRepository.findByProductIdAndStoreId(1L, 1L)).thenReturn(Mono.empty());
-        when(inventoryRepository.save(any(Inventory.class))).thenReturn(Mono.just(newInventory));
-        when(productRepository.findById(1L)).thenReturn(Mono.just(product));
-        when(storeRepository.findById(1L)).thenReturn(Mono.just(store));
+        when(productPort.findBySku("REM-001-BL-M")).thenReturn(Mono.just(product));
+        when(storePort.findById(1L)).thenReturn(Mono.just(store));
+        when(inventoryPort.findByProductIdAndStoreId(1L, 1L)).thenReturn(Mono.empty());
+        when(inventoryPort.save(any(Inventory.class))).thenReturn(Mono.just(newInventory));
+        when(productPort.findById(1L)).thenReturn(Mono.just(product));
+        when(storePort.findById(1L)).thenReturn(Mono.just(store));
         when(inventoryMapper.toResponse(any(Inventory.class))).thenReturn(inventoryResponse);
 
         // When
@@ -215,7 +215,7 @@ class InventoryServiceTest {
                 .expectNextMatches(response -> response.getProductSku().equals("REM-001-BL-M"))
                 .verifyComplete();
 
-        verify(inventoryRepository).save(any(Inventory.class));
+        verify(inventoryPort).save(any(Inventory.class));
     }
 
     @Test
@@ -234,11 +234,11 @@ class InventoryServiceTest {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        when(inventoryRepository.findByProductSkuAndStoreId("REM-001-BL-M", 1L))
+        when(inventoryPort.findByProductSkuAndStoreId("REM-001-BL-M", 1L))
                 .thenReturn(Mono.just(inventory));
-        when(inventoryRepository.save(any(Inventory.class))).thenReturn(Mono.just(updatedInventory));
-        when(productRepository.findById(1L)).thenReturn(Mono.just(product));
-        when(storeRepository.findById(1L)).thenReturn(Mono.just(store));
+        when(inventoryPort.save(any(Inventory.class))).thenReturn(Mono.just(updatedInventory));
+        when(productPort.findById(1L)).thenReturn(Mono.just(product));
+        when(storePort.findById(1L)).thenReturn(Mono.just(store));
         when(inventoryMapper.toResponse(any(Inventory.class))).thenReturn(inventoryResponse);
 
         // When
@@ -249,7 +249,7 @@ class InventoryServiceTest {
                 .expectNextMatches(response -> response.getProductSku().equals("REM-001-BL-M"))
                 .verifyComplete();
 
-        verify(inventoryRepository).save(any(Inventory.class));
+        verify(inventoryPort).save(any(Inventory.class));
     }
 
     @Test
@@ -259,7 +259,7 @@ class InventoryServiceTest {
                 .adjustment(-30)
                 .build();
 
-        when(inventoryRepository.findByProductSkuAndStoreId("REM-001-BL-M", 1L))
+        when(inventoryPort.findByProductSkuAndStoreId("REM-001-BL-M", 1L))
                 .thenReturn(Mono.just(inventory));
 
         // When
@@ -273,7 +273,7 @@ class InventoryServiceTest {
                 )
                 .verify();
 
-        verify(inventoryRepository, never()).save(any());
+        verify(inventoryPort, never()).save(any());
     }
 
     @Test
@@ -283,7 +283,7 @@ class InventoryServiceTest {
                 .adjustment(5)
                 .build();
 
-        when(inventoryRepository.findByProductSkuAndStoreId("INVALID-SKU", 1L))
+        when(inventoryPort.findByProductSkuAndStoreId("INVALID-SKU", 1L))
                 .thenReturn(Mono.empty());
 
         // When
@@ -297,7 +297,7 @@ class InventoryServiceTest {
                 )
                 .verify();
 
-        verify(inventoryRepository, never()).save(any());
+        verify(inventoryPort, never()).save(any());
     }
 
     @Test
@@ -318,6 +318,6 @@ class InventoryServiceTest {
                 )
                 .verify();
 
-        verify(inventoryRepository, never()).save(any());
+        verify(inventoryPort, never()).save(any());
     }
 }

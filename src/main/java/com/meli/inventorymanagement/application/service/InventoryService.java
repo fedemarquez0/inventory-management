@@ -5,13 +5,13 @@ import com.meli.inventorymanagement.application.dto.InventoryResponse;
 import com.meli.inventorymanagement.application.dto.InventoryUpdateRequest;
 import com.meli.inventorymanagement.application.mapper.InventoryMapper;
 import com.meli.inventorymanagement.common.constant.ErrorCode;
+import com.meli.inventorymanagement.domain.exception.BusinessException;
 import com.meli.inventorymanagement.domain.model.Inventory;
 import com.meli.inventorymanagement.domain.model.Product;
 import com.meli.inventorymanagement.domain.model.Store;
-import com.meli.inventorymanagement.infrastructure.adapter.output.persistence.InventoryRepository;
-import com.meli.inventorymanagement.infrastructure.adapter.output.persistence.ProductRepository;
-import com.meli.inventorymanagement.infrastructure.adapter.output.persistence.StoreRepository;
-import com.meli.inventorymanagement.infrastructure.exception.BusinessException;
+import com.meli.inventorymanagement.domain.port.InventoryPort;
+import com.meli.inventorymanagement.domain.port.ProductPort;
+import com.meli.inventorymanagement.domain.port.StorePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -28,9 +28,9 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class InventoryService {
 
-    private final InventoryRepository inventoryRepository;
-    private final ProductRepository productRepository;
-    private final StoreRepository storeRepository;
+    private final InventoryPort inventoryPort;
+    private final ProductPort productPort;
+    private final StorePort storePort;
     private final InventoryMapper inventoryMapper;
 
     public Flux<InventoryResponse> getInventoryByProductSku(String productSku) {
@@ -41,10 +41,10 @@ public class InventoryService {
             return Flux.error(new BusinessException(ErrorCode.INVALID_SKU_FORMAT, "Product SKU cannot be null or empty"));
         }
 
-        return productRepository.findBySku(productSku)
+        return productPort.findBySku(productSku)
                 .switchIfEmpty(Mono.error(new BusinessException(ErrorCode.PRODUCT_NOT_FOUND,
                         "Product with SKU " + productSku + " not found")))
-                .flatMapMany(product -> inventoryRepository.findByProductSku(productSku))
+                .flatMapMany(product -> inventoryPort.findByProductSku(productSku))
                 .flatMap(this::enrichInventoryWithRelations)
                 .map(inventoryMapper::toResponse)
                 .doOnError(error -> log.error("Database error while fetching inventory for SKU {}: {}",
@@ -65,7 +65,7 @@ public class InventoryService {
         }
 
         return validateStoreExists(storeId)
-                .then(Mono.defer(() -> inventoryRepository.findByProductSkuAndStoreId(productSku, storeId)))
+                .then(Mono.defer(() -> inventoryPort.findByProductSkuAndStoreId(productSku, storeId)))
                 .switchIfEmpty(Mono.error(new BusinessException(ErrorCode.INVENTORY_NOT_FOUND,
                         String.format("Inventory not found for product %s in store %d", productSku, storeId))))
                 .flatMap(this::enrichInventoryWithRelations)
@@ -93,10 +93,10 @@ public class InventoryService {
         }
 
         return Mono.zip(
-                productRepository.findBySku(productSku)
+                productPort.findBySku(productSku)
                         .switchIfEmpty(Mono.error(new BusinessException(ErrorCode.PRODUCT_NOT_FOUND,
                                 "Product with SKU " + productSku + " not found"))),
-                storeRepository.findById(storeId)
+                storePort.findById(storeId)
                         .switchIfEmpty(Mono.error(new BusinessException(ErrorCode.STORE_NOT_FOUND,
                                 "Store with ID " + storeId + " not found")))
         )
@@ -104,12 +104,12 @@ public class InventoryService {
             Product product = tuple.getT1();
             Store store = tuple.getT2();
 
-            return inventoryRepository.findByProductIdAndStoreId(product.getId(), store.getId())
+            return inventoryPort.findByProductIdAndStoreId(product.getId(), store.getId())
                     .flatMap(existingInventory -> {
                         existingInventory.setAvailableQty(request.getAvailableQty());
                         existingInventory.setUpdatedAt(LocalDateTime.now());
                         log.info("Updating existing inventory ID: {}", existingInventory.getId());
-                        return inventoryRepository.save(existingInventory);
+                        return inventoryPort.save(existingInventory);
                     })
                     .switchIfEmpty(Mono.defer(() -> {
                         Inventory newInventory = Inventory.builder()
@@ -119,7 +119,7 @@ public class InventoryService {
                                 .updatedAt(LocalDateTime.now())
                                 .build();
                         log.info("Creating new inventory entry");
-                        return inventoryRepository.save(newInventory);
+                        return inventoryPort.save(newInventory);
                     }));
         })
         .flatMap(this::enrichInventoryWithRelations)
@@ -150,7 +150,7 @@ public class InventoryService {
             return Mono.error(new BusinessException(ErrorCode.INVALID_ADJUSTMENT, "Adjustment value cannot be zero"));
         }
 
-        return inventoryRepository.findByProductSkuAndStoreId(productSku, storeId)
+        return inventoryPort.findByProductSkuAndStoreId(productSku, storeId)
                 .switchIfEmpty(Mono.error(new BusinessException(ErrorCode.INVENTORY_NOT_FOUND,
                         String.format("Inventory not found for product %s in store %d", productSku, storeId))))
                 .flatMap(inventory -> {
@@ -164,7 +164,7 @@ public class InventoryService {
 
                     inventory.setAvailableQty(newQuantity);
                     inventory.setUpdatedAt(LocalDateTime.now());
-                    return inventoryRepository.save(inventory)
+                    return inventoryPort.save(inventory)
                             .doOnSuccess(saved -> log.info("Inventory adjusted successfully. New quantity: {}, Version: {}",
                                     saved.getAvailableQty(), saved.getVersion()));
                 })
@@ -182,7 +182,7 @@ public class InventoryService {
     }
 
     private Mono<Void> validateStoreExists(Long storeId) {
-        return storeRepository.existsById(storeId)
+        return storePort.existsById(storeId)
                 .flatMap(exists -> {
                     if (!exists) {
                         return Mono.error(new BusinessException(ErrorCode.STORE_NOT_FOUND,
@@ -201,8 +201,8 @@ public class InventoryService {
 
     private Mono<Inventory> enrichInventoryWithRelations(Inventory inventory) {
         return Mono.zip(
-                productRepository.findById(inventory.getProductId()).defaultIfEmpty(new Product()),
-                storeRepository.findById(inventory.getStoreId()).defaultIfEmpty(new Store())
+                productPort.findById(inventory.getProductId()).defaultIfEmpty(new Product()),
+                storePort.findById(inventory.getStoreId()).defaultIfEmpty(new Store())
         )
         .map(tuple -> {
             inventory.setProduct(tuple.getT1());

@@ -1,7 +1,7 @@
 package com.meli.inventorymanagement.infrastructure.security;
 
 import com.meli.inventorymanagement.common.constant.ErrorCode;
-import com.meli.inventorymanagement.infrastructure.exception.BusinessException;
+import com.meli.inventorymanagement.domain.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;

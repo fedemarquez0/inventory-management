@@ -4,28 +4,23 @@ import com.meli.inventorymanagement.application.dto.InventoryResponse;
 import com.meli.inventorymanagement.domain.model.Inventory;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
 @Component
 public class InventoryMapper {
 
     public InventoryResponse toResponse(Inventory inventory) {
+        if (inventory == null) {
+            return null;
+        }
+
         return InventoryResponse.builder()
                 .id(inventory.getId())
-                .productSku(inventory.getProduct().getSku())
-                .productName(inventory.getProduct().getName())
-                .storeId(inventory.getStore().getId())
-                .storeName(inventory.getStore().getName())
+                .productSku(inventory.getProduct() != null ? inventory.getProduct().getSku() : null)
+                .productName(inventory.getProduct() != null ? inventory.getProduct().getName() : null)
+                .storeId(inventory.getStore() != null ? inventory.getStore().getId() : null)
+                .storeName(inventory.getStore() != null ? inventory.getStore().getName() : null)
                 .availableQty(inventory.getAvailableQty())
                 .version(inventory.getVersion())
                 .updatedAt(inventory.getUpdatedAt())
                 .build();
-    }
-
-    public List<InventoryResponse> toResponseList(List<Inventory> inventories) {
-        return inventories.stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
     }
 }

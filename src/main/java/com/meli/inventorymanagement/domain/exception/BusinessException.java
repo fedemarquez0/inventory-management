@@ -1,4 +1,4 @@
-package com.meli.inventorymanagement.infrastructure.exception;
+package com.meli.inventorymanagement.domain.exception;
 
 import com.meli.inventorymanagement.common.constant.ErrorCode;
 import lombok.Getter;
@@ -27,3 +27,4 @@ public class BusinessException extends RuntimeException {
         this.details = details;
     }
 }
+

@@ -1,6 +1,6 @@
 package com.meli.inventorymanagement.infrastructure.adapter.output.persistence;
 
-import com.meli.inventorymanagement.domain.model.User;
+import com.meli.inventorymanagement.infrastructure.adapter.output.persistence.entity.UserEntity;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.data.repository.query.Param;
@@ -8,9 +8,9 @@ import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Mono;
 
 @Repository
-public interface UserRepository extends R2dbcRepository<User, Long> {
+public interface UserRepository extends R2dbcRepository<UserEntity, Long> {
 
-    Mono<User> findByUsername(String username);
+    Mono<UserEntity> findByUsername(String username);
 
     @Query("SELECT CASE WHEN COUNT(*) > 0 THEN TRUE ELSE FALSE END " +
            "FROM users u " +

@@ -1,6 +1,7 @@
 package com.meli.inventorymanagement.infrastructure.exception;
 
 import com.meli.inventorymanagement.common.constant.ErrorCode;
+import com.meli.inventorymanagement.domain.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.web.WebProperties;
 import org.springframework.boot.autoconfigure.web.reactive.error.AbstractErrorWebExceptionHandler;
