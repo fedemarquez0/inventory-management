@@ -27,9 +27,9 @@ public class InventoryController {
     private final InventoryService inventoryService;
 
     @Operation(summary = "Get product inventory in all stores",
-            description = "Returns the stock of a product across all stores - Admin only")
+            description = "Returns the stock of a product across all stores - Admin and Web users")
     @GetMapping("/{productSku}/stores")
-    @RequireStorePermission(adminOnly = true)
+    @RequireStorePermission(adminOnly = true, webUserAllowed = true)
     public Flux<InventoryResponse> getInventoryByProduct(
             @PathVariable String productSku,
             ServerWebExchange exchange) {
@@ -40,7 +40,7 @@ public class InventoryController {
                 .flatMapMany(username -> {
                     String clientIp = getClientIpAddress(exchange);
 
-                    log.info("GET /api/inventory/{}/stores - User: {} - IP: {} - Admin inventory query for all stores",
+                    log.info("GET /api/inventory/{}/stores - User: {} - IP: {} - Inventory query for all stores",
                             productSku, username, clientIp);
 
                     return inventoryService.getInventoryByProductSku(productSku)

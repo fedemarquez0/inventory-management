@@ -10,4 +10,5 @@ import java.lang.annotation.Target;
 public @interface RequireStorePermission {
     String storeIdParam() default "storeId";
     boolean adminOnly() default false;
+    boolean webUserAllowed() default false;
 }

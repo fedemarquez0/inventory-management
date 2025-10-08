@@ -23,6 +23,6 @@ public class User {
     private LocalDateTime updatedAt;
 
     public enum Role {
-        ADMIN, STORE_USER
+        ADMIN, STORE_USER, WEB_USER
     }
 }

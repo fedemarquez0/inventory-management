@@ -27,6 +27,7 @@ public enum ErrorCode {
     ACCESS_DENIED_TO_STORE("AUTH-008", "Access denied to the specified store"),
     ADMIN_ACCESS_REQUIRED("AUTH-009", "Administrator access required for this operation"),
     STORE_PERMISSION_DENIED("AUTH-010", "Insufficient permissions for store operations"),
+    INSUFFICIENT_PERMISSIONS("AUTH-016", "Insufficient permissions to access this resource"),
     TOKEN_EXTRACTION_ERROR("AUTH-011", "Error processing authentication token"),
     USER_ROLE_INSUFFICIENT("AUTH-012", "User role insufficient for this operation"),
     USER_ACCOUNT_INACTIVE("AUTH-013", "User account is inactive"),

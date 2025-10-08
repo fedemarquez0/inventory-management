@@ -773,6 +773,117 @@ curl -X PUT "http://localhost:8080/api/inventory/REM-001-BL-M/stores/2" \
 
 ---
 
+### Flujo Completo: Usuario Web
+
+#### 1. Login como Web User
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"web","password":"12345"}'
+```
+
+**Respuesta:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ3ZWIiLCJyb2xlIjoiV0VCX1VTRVIiLCJpYXQiOjE2OTY3Njg4MDAsImV4cCI6MTY5Njg1NTIwMH0.xyz",
+  "type": "Bearer",
+  "username": "web",
+  "role": "WEB_USER"
+}
+```
+
+#### 2. Consultar Stock en Todas las Tiendas (PERMITIDO)
+```bash
+WEB_TOKEN="eyJhbGciOiJIUzI1NiJ9..."
+
+curl -X GET "http://localhost:8080/api/inventory/REM-001-BL-M/stores" \
+  -H "Authorization: Bearer $WEB_TOKEN"
+```
+
+**Respuesta:**
+```json
+[
+  {
+    "id": 1,
+    "productSku": "REM-001-BL-M",
+    "productName": "Remera Básica Blanca M",
+    "storeId": 1,
+    "storeName": "Shopping Dinosaurio Mall",
+    "availableQty": 25,
+    "version": 0,
+    "updatedAt": "2025-10-08T10:00:00"
+  },
+  {
+    "id": 2,
+    "productSku": "REM-001-BL-M",
+    "productName": "Remera Básica Blanca M",
+    "storeId": 2,
+    "storeName": "Centro Maipu 712",
+    "availableQty": 18,
+    "version": 0,
+    "updatedAt": "2025-10-08T10:00:00"
+  },
+  {
+    "id": 3,
+    "productSku": "REM-001-BL-M",
+    "productName": "Remera Básica Blanca M",
+    "storeId": 3,
+    "storeName": "Nuevo Centro Shopping",
+    "availableQty": 35,
+    "version": 0,
+    "updatedAt": "2025-10-08T10:00:00"
+  }
+]
+```
+
+#### 3. Intentar Consultar Tienda Específica (DENEGADO)
+```bash
+curl -X GET "http://localhost:8080/api/inventory/REM-001-BL-M/stores/1" \
+  -H "Authorization: Bearer $WEB_TOKEN"
+```
+
+**Respuesta (403 Forbidden):**
+```json
+{
+  "timestamp": "2025-10-08T12:10:00",
+  "status": 403,
+  "error": "Forbidden",
+  "errorCode": "INSUFFICIENT_PERMISSIONS",
+  "message": "Web users can only access product inventory queries",
+  "details": "User web attempted to access non-web endpoint",
+  "path": "/api/inventory/REM-001-BL-M/stores/1"
+}
+```
+
+#### 4. Intentar Actualizar Stock (DENEGADO)
+```bash
+curl -X PUT "http://localhost:8080/api/inventory/REM-001-BL-M/stores/1" \
+  -H "Authorization: Bearer $WEB_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"availableQty":100}'
+```
+
+**Respuesta (403 Forbidden):**
+```json
+{
+  "timestamp": "2025-10-08T12:15:00",
+  "status": 403,
+  "error": "Forbidden",
+  "errorCode": "INSUFFICIENT_PERMISSIONS",
+  "message": "Web users can only access product inventory queries",
+  "details": "User web attempted to access non-web endpoint",
+  "path": "/api/inventory/REM-001-BL-M/stores/1"
+}
+```
+
+**Resumen de Permisos WEB_USER:**
+- ✅ **PERMITIDO**: `GET /api/inventory/{productSku}/stores` - Consultar inventario de producto en todas las tiendas
+- ❌ **DENEGADO**: `GET /api/inventory/{productSku}/stores/{storeId}` - Consultar tienda específica
+- ❌ **DENEGADO**: `PUT /api/inventory/{productSku}/stores/{storeId}` - Actualizar stock
+- ❌ **DENEGADO**: `POST /api/inventory/{productSku}/stores/{storeId}/adjustments` - Ajustes de inventario
+
+---
+
 ## Base de Datos
 
 ### Esquema
@@ -866,6 +977,7 @@ CREATE TABLE user_store_permissions (
 | user_dinosaurio | 12345 | STORE_USER | 1 |
 | user_maipu | 12345 | STORE_USER | 2 |
 | user_nuevo_centro | 12345 | STORE_USER | 3 |
+| web | 12345 | WEB_USER | Solo consulta de inventario por producto |
 
 #### Productos (Ejemplos)
 - REM-001-BL-M: Remera Básica Blanca M
@@ -1053,3 +1165,4 @@ Para más información, consulta:
 - [RUN.md](../RUN.md) - Guía de ejecución
 
 ---
+

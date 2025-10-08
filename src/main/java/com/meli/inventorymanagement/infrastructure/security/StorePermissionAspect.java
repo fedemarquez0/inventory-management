@@ -33,7 +33,8 @@ public class StorePermissionAspect {
 
         Long storeId = extractStoreId(joinPoint, requireStorePermission.storeIdParam());
 
-        log.debug("Store permission check - storeId: {}, adminOnly: {}", storeId, requireStorePermission.adminOnly());
+        log.debug("Store permission check - storeId: {}, adminOnly: {}, webUserAllowed: {}",
+                storeId, requireStorePermission.adminOnly(), requireStorePermission.webUserAllowed());
 
         // Verificación de permisos que se ejecutará primero
         Mono<Void> permissionCheck = ReactiveSecurityContextHolder.getContext()
@@ -51,22 +52,38 @@ public class StorePermissionAspect {
                             .flatMap(user -> {
                                 log.debug("User found: {} with role: {}", username, user.getRole());
 
-                                // Si el endpoint es solo para admin, verificar que sea admin
-                                if (requireStorePermission.adminOnly()) {
-                                    if (!"ADMIN".equals(user.getRole())) {
-                                        log.warn("User {} attempted admin-only operation without admin role", username);
-                                        return Mono.error(new BusinessException(
-                                                ErrorCode.ADMIN_ACCESS_REQUIRED,
-                                                "User " + username + " does not have admin privileges"));
-                                    }
-                                    log.debug("Admin access granted for user: {}", username);
-                                    return Mono.empty();
-                                }
-
                                 // Si es admin, puede acceder a todo
                                 if ("ADMIN".equals(user.getRole())) {
                                     log.debug("Admin user {} granted access", username);
                                     return Mono.empty();
+                                }
+
+                                // Si el endpoint permite WEB_USER y el usuario es WEB_USER, permitir acceso
+                                if (requireStorePermission.webUserAllowed() && "WEB_USER".equals(user.getRole())) {
+                                    log.debug("Web user {} granted access to web-allowed endpoint", username);
+                                    return Mono.empty();
+                                }
+
+                                // Si el endpoint es solo para admin y no es admin, denegar
+                                if (requireStorePermission.adminOnly()) {
+                                    if ("WEB_USER".equals(user.getRole())) {
+                                        log.warn("Web user {} attempted admin-only operation", username);
+                                        return Mono.error(new BusinessException(
+                                                ErrorCode.INSUFFICIENT_PERMISSIONS,
+                                                "Web users can only access product inventory queries"));
+                                    }
+                                    log.warn("User {} attempted admin-only operation without admin role", username);
+                                    return Mono.error(new BusinessException(
+                                            ErrorCode.ADMIN_ACCESS_REQUIRED,
+                                            "User " + username + " does not have admin privileges"));
+                                }
+
+                                // WEB_USER solo puede acceder a endpoints marcados como webUserAllowed
+                                if ("WEB_USER".equals(user.getRole())) {
+                                    log.warn("Web user {} attempted to access non-web endpoint", username);
+                                    return Mono.error(new BusinessException(
+                                            ErrorCode.INSUFFICIENT_PERMISSIONS,
+                                            "Web users can only access product inventory queries"));
                                 }
 
                                 // Para usuarios de tienda, verificar permisos específicos

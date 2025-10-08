@@ -339,6 +339,7 @@ Resultado final es consistente
 #### Roles
 - **ADMIN**: Acceso total a todas las tiendas
 - **STORE_USER**: Acceso limitado a tiendas asignadas
+- **WEB_USER**: Acceso solo lectura a información de inventario
 
 #### Control de Acceso (AOP)
 
@@ -360,6 +361,7 @@ El aspecto `StorePermissionAspect` intercepta métodos y valida:
 | user_dinosaurio | 12345 | STORE_USER | Shopping Dinosaurio Mall (ID: 1) |
 | user_maipu | 12345 | STORE_USER | Centro Maipu 712 (ID: 2) |
 | user_nuevo_centro | 12345 | STORE_USER | Nuevo Centro Shopping (ID: 3) |
+| web | 12345 | WEB_USER | Solo consulta de inventario por producto |
 
 ---
 
