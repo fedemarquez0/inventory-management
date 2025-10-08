@@ -204,7 +204,49 @@ class InventoryServiceTest {
         when(inventoryPort.findByProductIdAndStoreId(1L, 1L)).thenReturn(Mono.empty());
         when(inventoryPort.save(any(Inventory.class))).thenReturn(Mono.just(newInventory));
         when(productPort.findById(1L)).thenReturn(Mono.just(product));
+        when(inventoryMapper.toResponse(any(Inventory.class))).thenReturn(inventoryResponse);
+
+        // When
+        Mono<InventoryResponse> result = inventoryService.updateInventory("REM-001-BL-M", 1L, request);
+
+        // Then
+        StepVerifier.create(result)
+                .expectNextMatches(response -> response.getProductSku().equals("REM-001-BL-M"))
+                .verifyComplete();
+
+        verify(inventoryPort).save(any(Inventory.class));
+    }
+
+    @Test
+    void updateInventory_UpdateExisting_Success() {
+        // Given
+        InventoryUpdateRequest request = InventoryUpdateRequest.builder()
+                .availableQty(50)
+                .build();
+
+        Inventory existingInventory = Inventory.builder()
+                .id(1L)
+                .productId(1L)
+                .storeId(1L)
+                .availableQty(25)
+                .version(0)
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        Inventory updatedInventory = Inventory.builder()
+                .id(1L)
+                .productId(1L)
+                .storeId(1L)
+                .availableQty(50)
+                .version(1)
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        when(productPort.findBySku("REM-001-BL-M")).thenReturn(Mono.just(product));
         when(storePort.findById(1L)).thenReturn(Mono.just(store));
+        when(inventoryPort.findByProductIdAndStoreId(1L, 1L)).thenReturn(Mono.just(existingInventory));
+        when(inventoryPort.save(any(Inventory.class))).thenReturn(Mono.just(updatedInventory));
+        when(productPort.findById(1L)).thenReturn(Mono.just(product));
         when(inventoryMapper.toResponse(any(Inventory.class))).thenReturn(inventoryResponse);
 
         // When
