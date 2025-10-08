@@ -5,6 +5,7 @@ Sistema profesional de gestión de inventario construido con **Spring Boot 3.5.6
 ## 📋 Tabla de Contenidos
 
 - [Descripción General](#-descripción-general)
+- [Contexto del Sistema](#-contexto-del-sistema)
 - [Características Principales](#-características-principales)
 - [Tecnologías Utilizadas](#-tecnologías-utilizadas)
 - [Arquitectura](#-arquitectura)
@@ -12,6 +13,8 @@ Sistema profesional de gestión de inventario construido con **Spring Boot 3.5.6
 - [Manejo de Concurrencia](#-manejo-de-concurrencia)
 - [Seguridad](#-seguridad)
 - [Estructura del Proyecto](#-estructura-del-proyecto)
+- [Inicio Rápido](#-inicio-rápido)
+- [Pruebas con Postman](#-pruebas-con-postman)
 - [Documentación Adicional](#-documentación-adicional)
 - [Licencia](#-licencia)
 
@@ -27,6 +30,42 @@ Este sistema de gestión de inventario es una aplicación empresarial que permit
 - **Autenticación y Autorización**: Sistema JWT con roles (Admin y Store User)
 - **Control de Permisos**: Los usuarios tienen acceso granular por tienda
 - **Operaciones Concurrentes**: Manejo seguro de múltiples operaciones simultáneas sobre el mismo inventario
+
+---
+
+## 🏬 Contexto del Sistema
+
+Este sistema funciona como **backend centralizado** para una cadena de tiendas minoristas. La arquitectura está diseñada para servir a múltiples clientes:
+
+### Arquitectura del Sistema
+
+![Diagrama General](docs/diagrams/diagrama%20general.png)
+
+### Flujo de Operaciones
+
+#### 1. **Tiendas Minoristas**
+Cada tienda cuenta con terminales de punto de venta que se conectan al backend para:
+- **Consultar stock disponible** antes de realizar una venta
+- **Actualizar inventario** cuando llega nueva mercancía
+- **Registrar ventas** con ajustes incrementales negativos
+- **Gestionar su propio inventario** con permisos limitados a su tienda
+
+**Autenticación:** Usuarios con rol `STORE_USER` tienen acceso solo a su(s) tienda(s) asignada(s).
+
+#### 2. **Página Web Pública**
+Una aplicación web orientada al cliente que se conecta al backend para:
+- **Mostrar disponibilidad de productos** en tiempo real
+- **Consultar stock por tienda** para que los clientes sepan dónde hay disponibilidad
+- **Información de inventario** solo lectura, sin capacidad de modificar
+
+**Autenticación:** Puede usar una cuenta con permisos de solo lectura o endpoints públicos específicos.
+
+#### 3. **Administración Central**
+Usuarios administradores con rol `ADMIN` tienen:
+- **Acceso completo** a todas las tiendas
+- **Capacidad de consultar** inventario global
+- **Gestión de productos** y configuraciones
+- **Monitoreo** de operaciones y logs
 
 ---
 
@@ -329,9 +368,17 @@ El aspecto `StorePermissionAspect` intercepta métodos y valida:
 ```
 inventory-management/
 ├── docs/                           # Documentación
-│   ├── diagrams/                   # Diagramas de secuencia (PNG)
-│   ├── DOCUMENTATION.md            # Documentación técnica completa
-│   └── mermaid/                    # Diagramas en formato Mermaid
+│   ├── diagrams/                   # Diagramas de arquitectura y flujo
+│   │   ├──mermaid/               # Diagramas en formato Mermaid
+│   │   ├── diagrama general.png   # Diagrama del sistema completo
+│   │   ├── diagrama login.png     # Flujo de autenticación
+│   │   ├── diagrama actualizar stock.png  # Ajuste de inventario
+│   │   ├── diagrama concurencia.png       # Manejo de concurrencia
+│   │   └── diagrama control errores.png   # Manejo de errores
+│   ├── postman/                    # Colecciones para pruebas
+│   │   ├── collections/           # Colecciones de Postman
+│   │   └── environments/          # Variables de entorno
+│   └── DOCUMENTATION.md            # Documentación técnica completa
 ├── logs/                           # Archivos de log
 ├── src/
 │   ├── main/
@@ -362,7 +409,7 @@ inventory-management/
 ├── inventory-db.mv.db             # Base de datos H2 (file)
 ├── pom.xml                        # Configuración Maven
 ├── README.md                      # Este archivo
-├── RUN.md                         # Guía de ejecución
+└── RUN.md                         # Guía de ejecución
 ```
 
 ### Módulos Principales
@@ -386,27 +433,10 @@ inventory-management/
 
 ---
 
-## 📚 Documentación Adicional
+## 🚀 Inicio Rápido
 
-- **[RUN.md](RUN.md)**: Guía paso a paso para ejecutar el proyecto localmente
-- **[docs/DOCUMENTATION.md](docs/DOCUMENTATION.md)**: Documentación técnica completa
-  - Endpoints detallados
-  - Códigos de error
-  - Diagramas de secuencia
-  - Ejemplos de requests/responses
-
-### Swagger UI
-
-Una vez ejecutado el proyecto, accede a la documentación interactiva:
-- **URL**: http://localhost:8080/swagger-ui.html
-- Prueba todos los endpoints desde el navegador
-- Autenticación JWT integrada
-
----
-
-## 🚀 Quick Start
-
-```bash
+**Windows:**
+```cmd
 # 1. Clonar el repositorio
 git clone <repository-url>
 cd inventory-management
@@ -421,13 +451,64 @@ mvnw spring-boot:run
 # http://localhost:8080/swagger-ui.html
 ```
 
-Para instrucciones detalladas, ver **[RUN.md](RUN.md)**
+**Linux/macOS:**
+```bash
+# 1. Clonar el repositorio
+git clone <repository-url>
+cd inventory-management
+
+# 2. Compilar el proyecto
+./mvnw clean package
+
+# 3. Ejecutar la aplicación
+./mvnw spring-boot:run
+
+# 4. Acceder a Swagger UI
+# http://localhost:8080/swagger-ui.html
+```
+
+Para instrucciones detalladas paso a paso, ver **[RUN.md](RUN.md)**
+
+---
+
+## 📮 Pruebas con Postman
+
+El proyecto incluye **colecciones completas de Postman** listas para usar, ubicadas en `docs/postman/`. Esto te permite probar todos los endpoints de manera rápida y sencilla.
+
+### 📦 Colecciones Incluidas
+
+#### 1. **Auth Collection** (`Auth.postman_collection.json`)
+Contiene requests para autenticación:
+- Login como Admin
+- Login como usuarios de tienda
+
+#### 2. **Inventory Collection** (`Inventory.postman_collection.json`)
+Operaciones completas de inventario:
+- Consultar inventario por producto y tienda
+- Listar todo el inventario de un producto
+- Actualizar cantidad absoluta
+- Ajustes incrementales (ventas/reposiciones)
+
+#### 3. **Documentation Collection** (`Documentation.postman_collection.json`)
+Ejemplos de la documentación técnica:
+- Swagger UI
+- OpenAPI documentación
+- Actuator Health
+
+### 🌍 Environment
+
+**Environment:** `dev.postman_environment.json`
+
+Variables preconfiguradas:
+- `base_url`: http://localhost:8080
+- `token`: Se actualiza automáticamente al hacer login
 
 ---
 
 ## 🧪 Testing
 
-```bash
+**Windows:**
+```cmd
 # Ejecutar todos los tests
 mvnw test
 
@@ -435,13 +516,70 @@ mvnw test
 mvnw clean test jacoco:report
 ```
 
+**Linux/macOS:**
+```bash
+# Ejecutar todos los tests
+./mvnw test
+
+# Ejecutar con reporte de cobertura
+./mvnw clean test jacoco:report
+```
+
 ---
 
-## 🤝 Contribución
+## 📚 Documentación Adicional
 
-Este es un proyecto educativo que demuestra:
-- Arquitectura Hexagonal en Spring Boot
-- Programación Reactiva con WebFlux
-- Control de Concurrencia con Optimistic Locking
-- Seguridad con JWT y RBAC
-- Mejores prácticas de desarrollo
+### Documentos Principales
+
+- **[RUN.md](RUN.md)**: Guía completa de ejecución para Windows, Linux y macOS
+- **[docs/DOCUMENTATION.md](docs/DOCUMENTATION.md)**: Documentación técnica de la API
+  - Endpoints detallados con ejemplos
+  - Códigos de error completos
+  - Diagramas de secuencia
+  - Modelos de datos
+  - Ejemplos de requests/responses
+
+### Recursos Visuales
+
+- **[docs/diagrams/diagrama general.png](docs/diagrams/diagrama%20general.png)**: Arquitectura completa del sistema
+- **[docs/diagrams/diagrama login.png](docs/diagrams/diagrama%20login.png)**: Flujo de autenticación JWT
+- **[docs/diagrams/diagrama actualizar stock.png](docs/diagrams/diagrama%20actualizar%20stock.png)**: Proceso de ajuste de inventario
+- **[docs/diagrams/diagrama concurencia.png](docs/diagrams/diagrama%20concurencia.png)**: Manejo de optimistic locking
+- **[docs/diagrams/diagrama control errores.png](docs/diagrams/diagrama%20control%20errores.png)**: Sistema de manejo de errores
+
+### Herramientas de Prueba
+
+- **[docs/postman/](docs/postman/)**: Colecciones completas de Postman
+- **Swagger UI**: http://localhost:8080/swagger-ui.html (cuando el servidor esté corriendo)
+
+---
+
+## 💡 Casos de Uso Típicos
+
+### 1. Venta en Tienda
+```
+1. Usuario de tienda hace login
+2. Consulta stock disponible del producto
+3. Realiza ajuste negativo (ej: -3 unidades vendidas)
+4. Sistema valida stock suficiente
+5. Actualiza inventario con control de concurrencia
+```
+
+### 2. Reposición de Stock
+```
+1. Usuario autorizado hace login
+2. Consulta inventario actual
+3. Realiza ajuste positivo (ej: +50 unidades recibidas)
+4. Sistema actualiza inventario
+```
+
+### 3. Consulta desde Web Pública
+```
+1. Aplicación web consulta disponibilidad
+2. Sistema retorna stock en todas las tiendas
+3. Cliente ve dónde hay disponibilidad
+```
+
+---
+
+**¡Gracias por usar el Sistema de Gestión de Inventario!** 🎉

@@ -2,6 +2,9 @@
 
 ## Tabla de Contenidos
 
+- [Introducción](#introducción)
+- [Contexto del Sistema](#contexto-del-sistema)
+- [Pruebas con Postman](#pruebas-con-postman)
 - [API Reference](#api-reference)
   - [Autenticación](#autenticación)
   - [Endpoints de Inventario](#endpoints-de-inventario)
@@ -12,6 +15,87 @@
 - [Base de Datos](#base-de-datos)
 
 ---
+
+## Introducción
+
+Esta documentación proporciona una referencia completa de la API REST del Sistema de Gestión de Inventario. El sistema está construido con Spring Boot 3.5.6 y Spring WebFlux, implementando programación reactiva completa.
+
+**URL Base:** `http://localhost:8080`
+
+**Características principales:**
+- API REST completamente reactiva (Mono/Flux)
+- Autenticación JWT con roles (ADMIN, STORE_USER)
+- Control de concurrencia con Optimistic Locking
+- Documentación interactiva con Swagger/OpenAPI
+- Colecciones de Postman listas para usar
+
+---
+
+## Contexto del Sistema
+
+El sistema funciona como **backend centralizado** para una cadena de tiendas minoristas, sirviendo a múltiples tipos de clientes:
+
+### Arquitectura General
+
+```
+Tiendas (POS) ──┐
+                │
+                ├──► Backend Centralizado ◄──── Página Web Pública
+                │    (Sistema de Inventario)
+Tiendas (POS) ──┘
+```
+
+### Actores del Sistema
+
+1. **Tiendas Minoristas (POS/Terminales)**
+   - Consultan stock antes de vender
+   - Actualizan inventario (reposiciones)
+   - Registran ventas (ajustes negativos)
+   - Acceso limitado a su(s) tienda(s)
+
+2. **Página Web Pública**
+   - Consulta disponibilidad de productos
+   - Muestra stock por tienda
+   - Solo lectura, sin modificaciones
+
+3. **Administradores**
+   - Acceso completo a todas las tiendas
+   - Gestión global de inventario
+   - Monitoreo y configuración
+
+---
+
+## Pruebas con Postman
+
+El proyecto incluye **colecciones completas de Postman** para facilitar las pruebas de la API. Todas las colecciones están preconfiguradas y listas para usar.
+
+### 📂 Ubicación
+
+```
+docs/postman/
+├── collections/
+│   ├── Auth.postman_collection.json
+│   ├── Inventory.postman_collection.json
+│   └── Documentation.postman_collection.json
+└── environments/
+    └── dev.postman_environment.json
+```
+
+### 📦 Colecciones Disponibles
+
+#### 1. **Auth Collection**
+Pruebas de autenticación:
+- ✅ Login exitoso (Admin)
+- ✅ Login usuarios de tienda
+
+#### 2. **Inventory Collection**
+Operaciones de inventario:
+- 📋 Consultar inventario por producto y tienda
+- 📋 Listar inventario de un producto en todas las tiendas
+- ✏️ Actualizar cantidad absoluta
+- ➕➖ Ajustes incrementales (ventas/reposiciones)
+
+--- 
 
 ## API Reference
 
@@ -962,8 +1046,10 @@ logging:
 
 ---
 
-## Contacto y Soporte
+## Mas Información
 
 Para más información, consulta:
 - [README.md](../README.md) - Visión general del proyecto
 - [RUN.md](../RUN.md) - Guía de ejecución
+
+---
